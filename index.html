@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Collision Engine</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <div id="canvas-resizer">
+      <canvas id="myCanvas"></canvas>
+    </div>
+    <div class="ui-container">
+      <div>"Volume" (Area): <span id="volume-reading"></span></div>
+      <div># of Particles: <span id="amount-reading"></span></div>
+      <div>Temperature: <span id="temperature-reading"></span></div>
+      <br />
+      <div>Pressure: <span id="pressure-reading"></span></div>
+      <br />
+      <div id="histogram1" style="width: 700px; height: 500px"></div>
+    </div>
+
+    <script src="https://cdn.plot.ly/plotly-3.0.1.min.js"></script>
+    <script src="index.js"></script>
+  </body>
+</html>
