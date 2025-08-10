@@ -241,6 +241,11 @@ class Ball {
 
 // }
 
+type dimensions = {
+  height: number,
+  width: number
+} 
+
 // ==================================================================================================
 // ==== Main Code ===================================================================================
 // ==================================================================================================
@@ -254,10 +259,16 @@ const volumeReading = document.getElementById("volume-reading");
 const amountReading = document.getElementById("amount-reading");
 const temperatureReading = document.getElementById("temperature-reading");
 
+const canvasResizeForm: any = document.getElementById("canvas-resize-form");
+const heightInput: any = document.getElementById("height-input");
+const widthInput: any = document.getElementById("width-input");
+
 const CANVAS_RECT = canvas.getBoundingClientRect();
 const FPS = 20;
 
-let canvasSize = updateCanvasSize()
+let canvasSize: dimensions;
+
+updateCanvasSize()
 
 // ==== Global Vars ==================================
 
@@ -313,30 +324,6 @@ function getRandFloat(min: number, max: number) {
   return Math.random() * (max - min) + min;
 }
 
-function updateCanvasSize(prevSize: {height: number, width: number} | null = null): {height: number, width: number} {
-  const snapSize = 1;
-  const minSize = 1;
-  
-  if (prevSize === null || prevSize.height !== canvas.clientHeight || prevSize.width !== canvas.clientWidth) {    
-    const newHeight = Math.max(minSize, Math.floor(canvas.clientHeight / snapSize) * snapSize);
-    const newWidth = Math.max(minSize, Math.floor(canvas.clientWidth / snapSize) * snapSize);
-
-    canvas.height = newHeight;
-    canvas.width = newWidth;
-    canvasResizer.style.height = `${newHeight}px`;
-    canvasResizer.style.width = `${newWidth}px`;
-
-    isPaused = true;
-
-    console.log("Container Resized!")
-  }
-  else {
-    isPaused = false;
-  }
-
-  return {height: canvas.clientHeight, width: canvas.clientWidth};
-}
-
 // Random integer from min to max inclusive
 function getRandInt(min: number, max: number) {
   min = Math.ceil(min);
@@ -361,6 +348,47 @@ function getCursorPosition(event: any): Vector {
   const y = event.clientY - CANVAS_RECT.top;
   return new Vector(x, y);
 }
+
+
+
+function resizeCanvas(newSize: dimensions): void {
+  const snapSize = 1;
+  const minSize = 1;
+
+  const newHeight = Math.max(minSize, Math.floor(newSize.height / snapSize) * snapSize);
+  const newWidth = Math.max(minSize, Math.floor(newSize.width / snapSize) * snapSize);
+
+  // Resize canvas and canvasResizer
+  canvas.height = newHeight;
+  canvas.width = newWidth;
+  canvasResizer.style.height = `${newHeight}px`;
+  canvasResizer.style.width = `${newWidth}px`;
+  
+  // Update resizing input placeholder values
+  heightInput.placeholder = newHeight;
+  widthInput.placeholder = newWidth;
+  heightInput.value = "";
+  widthInput.value = "";
+
+  canvasSize = {height: newHeight, width: newWidth}
+
+  console.log("Container Resized!")
+}
+
+function updateCanvasSize(prevSize: dimensions | null = null): void {
+
+  if (prevSize === null || prevSize.height !== canvas.clientHeight || prevSize.width !== canvas.clientWidth) {
+    resizeCanvas({height: canvas.clientHeight, width: canvas.clientWidth});
+
+    isPaused = true;
+  }
+
+  else {
+    isPaused = false;
+  }
+
+}
+
 
 // ==== TRACKING FUNCTIONS ==================================
 
@@ -499,7 +527,7 @@ function drawVector(ctx: any, posX: number, posY: number, magX: number, magY: nu
 
 
 function drawFrame(): void {
-  canvasSize = updateCanvasSize(canvasSize);
+  updateCanvasSize(canvasSize);
 
   // Clear canvas
   ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -572,4 +600,23 @@ document.addEventListener("keydown", function (e) {
   if (e.key === " ") {
     allowCollisions = !allowCollisions
   }
+});
+
+canvasResizeForm.addEventListener("submit", function (e) {
+  e.preventDefault();
+
+  let submittedHeight = heightInput.value;
+  let submittedWidth = widthInput.value;
+
+  if (submittedHeight === "") {
+    submittedHeight = canvasSize.height;
+  }
+  if (submittedWidth === "") {
+    submittedWidth = canvasSize.width;
+  }
+
+  const newSize = {height: parseInt(submittedHeight), width: parseInt(submittedWidth)}
+
+  resizeCanvas(newSize)
+  
 });

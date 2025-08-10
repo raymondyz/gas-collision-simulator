@@ -179,14 +179,6 @@ var Ball = /** @class */ (function () {
     };
     return Ball;
 }());
-// class ParticleFluid {
-//   particleList: Ball[];
-//   color: string;
-//   constructor(particleList: Ball[] = [], color: string = "black") {
-//     this.particleList = particleList;
-//     this.color = color;
-//   }
-// }
 // ==================================================================================================
 // ==== Main Code ===================================================================================
 // ==================================================================================================
@@ -196,9 +188,13 @@ var canvasResizer = document.getElementById("canvas-resizer");
 var volumeReading = document.getElementById("volume-reading");
 var amountReading = document.getElementById("amount-reading");
 var temperatureReading = document.getElementById("temperature-reading");
+var canvasResizeForm = document.getElementById("canvas-resize-form");
+var heightInput = document.getElementById("height-input");
+var widthInput = document.getElementById("width-input");
 var CANVAS_RECT = canvas.getBoundingClientRect();
 var FPS = 20;
-var canvasSize = updateCanvasSize();
+var canvasSize;
+updateCanvasSize();
 // ==== Global Vars ==================================
 var isPaused = false;
 var allowCollisions = true;
@@ -231,25 +227,6 @@ function getDist(vec1, vec2) {
 function getRandFloat(min, max) {
     return Math.random() * (max - min) + min;
 }
-function updateCanvasSize(prevSize) {
-    if (prevSize === void 0) { prevSize = null; }
-    var snapSize = 1;
-    var minSize = 1;
-    if (prevSize === null || prevSize.height !== canvas.clientHeight || prevSize.width !== canvas.clientWidth) {
-        var newHeight = Math.max(minSize, Math.floor(canvas.clientHeight / snapSize) * snapSize);
-        var newWidth = Math.max(minSize, Math.floor(canvas.clientWidth / snapSize) * snapSize);
-        canvas.height = newHeight;
-        canvas.width = newWidth;
-        canvasResizer.style.height = "".concat(newHeight, "px");
-        canvasResizer.style.width = "".concat(newWidth, "px");
-        isPaused = true;
-        console.log("Container Resized!");
-    }
-    else {
-        isPaused = false;
-    }
-    return { height: canvas.clientHeight, width: canvas.clientWidth };
-}
 // Random integer from min to max inclusive
 function getRandInt(min, max) {
     min = Math.ceil(min);
@@ -272,6 +249,34 @@ function getCursorPosition(event) {
     var x = event.clientX - CANVAS_RECT.left;
     var y = event.clientY - CANVAS_RECT.top;
     return new Vector(x, y);
+}
+function resizeCanvas(newSize) {
+    var snapSize = 1;
+    var minSize = 1;
+    var newHeight = Math.max(minSize, Math.floor(newSize.height / snapSize) * snapSize);
+    var newWidth = Math.max(minSize, Math.floor(newSize.width / snapSize) * snapSize);
+    // Resize canvas and canvasResizer
+    canvas.height = newHeight;
+    canvas.width = newWidth;
+    canvasResizer.style.height = "".concat(newHeight, "px");
+    canvasResizer.style.width = "".concat(newWidth, "px");
+    // Update resizing input placeholder values
+    heightInput.placeholder = newHeight;
+    widthInput.placeholder = newWidth;
+    heightInput.value = "";
+    widthInput.value = "";
+    canvasSize = { height: newHeight, width: newWidth };
+    console.log("Container Resized!");
+}
+function updateCanvasSize(prevSize) {
+    if (prevSize === void 0) { prevSize = null; }
+    if (prevSize === null || prevSize.height !== canvas.clientHeight || prevSize.width !== canvas.clientWidth) {
+        resizeCanvas({ height: canvas.clientHeight, width: canvas.clientWidth });
+        isPaused = true;
+    }
+    else {
+        isPaused = false;
+    }
 }
 // ==== TRACKING FUNCTIONS ==================================
 function getAvgMomentum(balls) {
@@ -389,7 +394,7 @@ function drawVector(ctx, posX, posY, magX, magY) {
 }
 // ==== DRAW FUNCTIONS ==================================
 function drawFrame() {
-    canvasSize = updateCanvasSize(canvasSize);
+    updateCanvasSize(canvasSize);
     // Clear canvas
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     // Draw balls
@@ -444,4 +449,17 @@ document.addEventListener("keydown", function (e) {
     if (e.key === " ") {
         allowCollisions = !allowCollisions;
     }
+});
+canvasResizeForm.addEventListener("submit", function (e) {
+    e.preventDefault();
+    var submittedHeight = heightInput.value;
+    var submittedWidth = widthInput.value;
+    if (submittedHeight === "") {
+        submittedHeight = canvasSize.height;
+    }
+    if (submittedWidth === "") {
+        submittedWidth = canvasSize.width;
+    }
+    var newSize = { height: parseInt(submittedHeight), width: parseInt(submittedWidth) };
+    resizeCanvas(newSize);
 });
