@@ -140,8 +140,7 @@ class Ball {
 
     // Wall impulse tracking
     const impulse = this.vel.getDifference(velocity_f).getScaled(this.mass)
-    trackNewWallImpulse(impulse.getMagnitude())
-
+    wallImpulseTracker.addEntry(createTimedNumber(frameNum, impulse.getMagnitude()))
 
     this.vel = velocity_f;
   }
@@ -237,9 +236,90 @@ class Ball {
 //   }
 
 
+// A number tied to a timestamp
+type timedNumber = {
+  timestamp: number,
+  value: number
+}
 
+// A stack of timed numbers
+// !!! Timed numbers must be added in chronological order
+class TimedNumberStack {
+  maxAmount: number;
 
-// }
+  entryList: timedNumber[] = [];
+
+  constructor(maxAmount: number = 10000) {
+    this.maxAmount = maxAmount
+  }
+
+  getTimeWindow(): number {
+    if (this.entryList.length < 2) {
+      return 0
+    }
+
+    return (this.entryList[this.entryList.length-1].timestamp - this.entryList[0].timestamp)
+  }
+
+  addEntry(entry: timedNumber): void {
+    // Error if entry is not in chronological order
+    if (this.entryList.length !== 0 && entry.timestamp < this.entryList[this.entryList.length-1].timestamp) {
+      console.error("Entry is not in chronological order")
+      return
+    }
+
+    this.entryList.push(entry);
+
+    if (this.entryList.length > this.maxAmount) {
+      this.entryList.shift()
+    }
+  }
+
+  purgeOldEntries(oldestAcceptedTimestamp: number): void {
+
+    // Find oldest allowed entry
+    for (let i = 0; i < this.entryList.length; i ++) {
+      if (this.entryList[i].timestamp >= oldestAcceptedTimestamp) {
+
+        // Remove all previous entries
+        this.entryList.splice(0, i);
+        return;
+      }
+    }
+
+    // All entries are too old
+    this.entryList.splice(0)
+  }
+
+  getNewEntries(oldestAcceptedTimestamp: number): timedNumber[] {
+
+    // Find oldest wanted entry
+    for (let i = 0; i < this.entryList.length; i ++) {
+      if (this.entryList[i].timestamp >= oldestAcceptedTimestamp) {
+
+        // Return this and all later entries
+        return this.entryList.slice(i);
+      }
+    }
+
+    // No entries are new enough
+    return [];
+  }
+
+  sumNewEntries(oldestAcceptedTimestamp: number): number {
+    const validEntries = this.getNewEntries(oldestAcceptedTimestamp);
+
+    let total = 0;
+
+    for (const entry of validEntries) {
+      total += entry.value
+    }
+
+    return total
+  }
+
+}
+
 
 type dimensions = {
   height: number,
@@ -258,6 +338,8 @@ const canvasResizer: any = document.getElementById("canvas-resizer");
 const volumeReading = document.getElementById("volume-reading");
 const amountReading = document.getElementById("amount-reading");
 const temperatureReading = document.getElementById("temperature-reading");
+const pressureReading = document.getElementById("pressure-reading");
+const avgKEReading = document.getElementById("avg-ke-reading");
 
 const canvasResizeForm: any = document.getElementById("canvas-resize-form");
 const heightInput: any = document.getElementById("height-input");
@@ -276,16 +358,13 @@ let isPaused = false;
 
 let allowCollisions = true;
 let initalBallAmount = 1000
-let initialBallSpeed = 15
+let initialBallSpeed = 10
 let ballRadius = 7
 
 // ==== Tracking Vars ==================================
 
 let frameNum = 0;
-
-let totalWallImpulse = 0;
-
-const trackingTime = 500
+const wallImpulseTracker = new TimedNumberStack();
 
 
 // ==== Initial Setup ==================================
@@ -343,6 +422,10 @@ function createRandBall(speed: number = 10, radius: number = 20, mass: number = 
   return new Ball(pos, mass, radius, vel.getRotated(angle))
 }
 
+function createTimedNumber(timestamp: number, value: number): timedNumber {
+  return {timestamp: timestamp, value: value};
+}
+
 function getCursorPosition(event: any): Vector {
   const x = event.clientX - CANVAS_RECT.left;
   const y = event.clientY - CANVAS_RECT.top;
@@ -376,17 +459,9 @@ function resizeCanvas(newSize: dimensions): void {
 }
 
 function updateCanvasSize(prevSize: dimensions | null = null): void {
-
   if (prevSize === null || prevSize.height !== canvas.clientHeight || prevSize.width !== canvas.clientWidth) {
     resizeCanvas({height: canvas.clientHeight, width: canvas.clientWidth});
-
-    isPaused = true;
   }
-
-  else {
-    isPaused = false;
-  }
-
 }
 
 
@@ -503,9 +578,6 @@ function updateHistogram(balls: Ball[] = ballList): void {
   Plotly.newPlot('histogram1', data, layout);
 }
 
-function trackNewWallImpulse(impulse: number): void {
-  totalWallImpulse += impulse
-}
 
 // ==== OTHER FUNCTIONS ==================================
 
@@ -542,11 +614,18 @@ function drawFrame(): void {
 function updateUI(): void {
   updateHistogram(ballList);
 
-  const volume = canvas.width*canvas.height
+  const avgingWindow = bound(wallImpulseTracker.getTimeWindow(), 1, 20);
+
+  const volume = canvas.width*canvas.height;
+  const area = 2*(canvas.width + canvas.height);
+  const impulsePerFrame = wallImpulseTracker.sumNewEntries(frameNum - avgingWindow) / avgingWindow;
+  const pressure = impulsePerFrame / area;
 
   volumeReading!.innerText = volume.toString();
   amountReading!.innerText = ballList.length.toString();
-  temperatureReading!.innerHTML = getTemperature(ballList).toFixed(2).toString();
+  temperatureReading!.innerText = getTemperature(ballList).toFixed(2).toString();
+  avgKEReading!.innerText = getAvgKE(ballList).toFixed(2).toString();
+  pressureReading!.innerText = pressure.toFixed(5).toString();
 }
 
 function updateFrame(): void {

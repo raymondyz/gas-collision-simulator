@@ -106,7 +106,7 @@ var Ball = /** @class */ (function () {
         var velocity_f = normalVel_f.getAddition(tangentVel_f); // Final ball velocity
         // Wall impulse tracking
         var impulse = this.vel.getDifference(velocity_f).getScaled(this.mass);
-        trackNewWallImpulse(impulse.getMagnitude());
+        wallImpulseTracker.addEntry(createTimedNumber(frameNum, impulse.getMagnitude()));
         this.vel = velocity_f;
     };
     Ball.prototype.applyWallCollision = function (xMin, yMin, xMax, yMax) {
@@ -179,6 +179,65 @@ var Ball = /** @class */ (function () {
     };
     return Ball;
 }());
+// A stack of timed numbers
+// !!! Timed numbers must be added in chronological order
+var TimedNumberStack = /** @class */ (function () {
+    function TimedNumberStack(maxAmount) {
+        if (maxAmount === void 0) { maxAmount = 10000; }
+        this.entryList = [];
+        this.maxAmount = maxAmount;
+    }
+    TimedNumberStack.prototype.getTimeWindow = function () {
+        if (this.entryList.length < 2) {
+            return 0;
+        }
+        return (this.entryList[this.entryList.length - 1].timestamp - this.entryList[0].timestamp);
+    };
+    TimedNumberStack.prototype.addEntry = function (entry) {
+        // Error if entry is not in chronological order
+        if (this.entryList.length !== 0 && entry.timestamp < this.entryList[this.entryList.length - 1].timestamp) {
+            console.error("Entry is not in chronological order");
+            return;
+        }
+        this.entryList.push(entry);
+        if (this.entryList.length > this.maxAmount) {
+            this.entryList.shift();
+        }
+    };
+    TimedNumberStack.prototype.purgeOldEntries = function (oldestAcceptedTimestamp) {
+        // Find oldest allowed entry
+        for (var i = 0; i < this.entryList.length; i++) {
+            if (this.entryList[i].timestamp >= oldestAcceptedTimestamp) {
+                // Remove all previous entries
+                this.entryList.splice(0, i);
+                return;
+            }
+        }
+        // All entries are too old
+        this.entryList.splice(0);
+    };
+    TimedNumberStack.prototype.getNewEntries = function (oldestAcceptedTimestamp) {
+        // Find oldest wanted entry
+        for (var i = 0; i < this.entryList.length; i++) {
+            if (this.entryList[i].timestamp >= oldestAcceptedTimestamp) {
+                // Return this and all later entries
+                return this.entryList.slice(i);
+            }
+        }
+        // No entries are new enough
+        return [];
+    };
+    TimedNumberStack.prototype.sumNewEntries = function (oldestAcceptedTimestamp) {
+        var validEntries = this.getNewEntries(oldestAcceptedTimestamp);
+        var total = 0;
+        for (var _i = 0, validEntries_1 = validEntries; _i < validEntries_1.length; _i++) {
+            var entry = validEntries_1[_i];
+            total += entry.value;
+        }
+        return total;
+    };
+    return TimedNumberStack;
+}());
 // ==================================================================================================
 // ==== Main Code ===================================================================================
 // ==================================================================================================
@@ -188,6 +247,8 @@ var canvasResizer = document.getElementById("canvas-resizer");
 var volumeReading = document.getElementById("volume-reading");
 var amountReading = document.getElementById("amount-reading");
 var temperatureReading = document.getElementById("temperature-reading");
+var pressureReading = document.getElementById("pressure-reading");
+var avgKEReading = document.getElementById("avg-ke-reading");
 var canvasResizeForm = document.getElementById("canvas-resize-form");
 var heightInput = document.getElementById("height-input");
 var widthInput = document.getElementById("width-input");
@@ -199,12 +260,11 @@ updateCanvasSize();
 var isPaused = false;
 var allowCollisions = true;
 var initalBallAmount = 1000;
-var initialBallSpeed = 15;
+var initialBallSpeed = 10;
 var ballRadius = 7;
 // ==== Tracking Vars ==================================
 var frameNum = 0;
-var totalWallImpulse = 0;
-var trackingTime = 500;
+var wallImpulseTracker = new TimedNumberStack();
 // ==== Initial Setup ==================================
 var ballList = [];
 for (var i = 0; i < initalBallAmount; i++) {
@@ -245,6 +305,9 @@ function createRandBall(speed, radius, mass) {
     var pos = new Vector(getRandInt(radius, canvas.width - radius), getRandInt(radius, canvas.height - radius));
     return new Ball(pos, mass, radius, vel.getRotated(angle));
 }
+function createTimedNumber(timestamp, value) {
+    return { timestamp: timestamp, value: value };
+}
 function getCursorPosition(event) {
     var x = event.clientX - CANVAS_RECT.left;
     var y = event.clientY - CANVAS_RECT.top;
@@ -272,10 +335,6 @@ function updateCanvasSize(prevSize) {
     if (prevSize === void 0) { prevSize = null; }
     if (prevSize === null || prevSize.height !== canvas.clientHeight || prevSize.width !== canvas.clientWidth) {
         resizeCanvas({ height: canvas.clientHeight, width: canvas.clientWidth });
-        isPaused = true;
-    }
-    else {
-        isPaused = false;
     }
 }
 // ==== TRACKING FUNCTIONS ==================================
@@ -377,9 +436,6 @@ function updateHistogram(balls) {
     // @ts-ignore
     Plotly.newPlot('histogram1', data, layout);
 }
-function trackNewWallImpulse(impulse) {
-    totalWallImpulse += impulse;
-}
 // ==== OTHER FUNCTIONS ==================================
 function drawVector(ctx, posX, posY, magX, magY) {
     var toX = posX + magX;
@@ -405,10 +461,16 @@ function drawFrame() {
 }
 function updateUI() {
     updateHistogram(ballList);
+    var avgingWindow = bound(wallImpulseTracker.getTimeWindow(), 1, 20);
     var volume = canvas.width * canvas.height;
+    var area = 2 * (canvas.width + canvas.height);
+    var impulsePerFrame = wallImpulseTracker.sumNewEntries(frameNum - avgingWindow) / avgingWindow;
+    var pressure = impulsePerFrame / area;
     volumeReading.innerText = volume.toString();
     amountReading.innerText = ballList.length.toString();
-    temperatureReading.innerHTML = getTemperature(ballList).toFixed(2).toString();
+    temperatureReading.innerText = getTemperature(ballList).toFixed(2).toString();
+    avgKEReading.innerText = getAvgKE(ballList).toFixed(2).toString();
+    pressureReading.innerText = pressure.toFixed(5).toString();
 }
 function updateFrame() {
     updateUI();
