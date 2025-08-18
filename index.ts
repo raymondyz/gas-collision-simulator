@@ -2,6 +2,30 @@
 // ==== Classes =====================================================================================
 // ==================================================================================================
 
+class Utils {
+  static getDist(vec1: {x: number, y: number}, vec2: {x: number, y: number}): number {
+    return Math.sqrt((vec1.x - vec2.x)**2 + (vec1.y - vec2.y)**2);
+  }
+
+  static getRandFloat(min: number, max: number) {
+    return Math.random() * (max - min) + min;
+  }
+
+  // Random integer from min to max inclusive
+  static getRandInt(min: number, max: number) {
+    min = Math.ceil(min);
+    max = Math.floor(max);
+    return Math.floor(Math.random() * (max - min + 1)) + min;
+  }
+
+  static bound(value: number, bound1: number, bound2: number): number {
+    const max = Math.max(bound1, bound2);
+    const min = Math.min(bound1, bound2);
+    return Math.max(Math.min(value, max), min);
+  }
+
+}
+
 class Vector {
   x: number;
   y: number;
@@ -99,13 +123,13 @@ class Ball {
   radius: number;
   color: string;
 
-  constructor(pos: Vector, mass: number = 1, radius: number = 20, vel: Vector = new Vector(0, 0)) {
+  constructor(pos: Vector, mass: number = 1, radius: number = 20, vel: Vector = new Vector(0, 0), color: string = "black") {
     this.pos = pos;
     this.vel = vel;
     this.mass = mass;
 
     this.radius = radius;
-    this.color = "black";
+    this.color = color;
   }
 
   draw(ctx: any): void {
@@ -204,7 +228,7 @@ class Ball {
   // Collides balls if within reach and moving in correct direction
   attemptBallCollision(other: Ball): void {
     // Ignore if balls are not touching
-    if (getDist(this.pos, other.pos) >= this.radius + other.radius) {
+    if (Utils.getDist(this.pos, other.pos) >= this.radius + other.radius) {
       return
     }
 
@@ -226,14 +250,126 @@ class Ball {
 
 }
 
-// class ParticleFluid {
-//   particleList: Ball[];
-//   color: string;
+class ParticleFluid {
+  particleList: Ball[];
+  color: string;
+  mass: number;
+  radius: number;
 
-//   constructor(particleList: Ball[] = [], color: string = "black") {
-//     this.particleList = particleList;
-//     this.color = color;
-//   }
+  constructor(particleList: Ball[] = [], color: string = "black", mass: number = 1, radius: number = 7) {
+    this.particleList = particleList;
+    this.color = color;
+    this.mass = mass;
+    this.radius = radius;
+  }
+
+  createParticle(vel: Vector | undefined = undefined, pos: Vector | undefined = undefined, color: string | undefined = undefined, mass: number | undefined = undefined, radius: number | undefined = undefined): void {
+    if (radius === undefined) {
+      radius = this.radius;
+    }
+    if (pos === undefined) {
+      pos = new Vector(Utils.getRandInt(radius, canvas.width - radius), Utils.getRandInt(radius, canvas.height - radius));
+    }
+    if (vel === undefined) {
+      vel = new Vector(0, 0);
+    }
+    if (color === undefined) {
+      color = this.color;
+    }
+    if (mass === undefined) {
+      mass = this.mass;
+    }
+
+    const particle = new Ball(pos, mass, radius, vel, color);
+
+    this.particleList.push(particle);
+  }
+
+  createKEParticle(KE: number, pos: Vector | undefined = undefined, direction: Vector | undefined = undefined, color: string | undefined = undefined, mass: number | undefined = undefined, radius: number | undefined = undefined): void {
+    if (mass === undefined) {
+      mass = this.mass;
+    }
+
+    // KE = 0.5 * m * (v**2)
+    // v = sqrt(2 * KE / m)
+    const speed = Math.sqrt(2 * KE / mass)
+    let vel: Vector;
+    if (direction === undefined) {
+      const angle = Utils.getRandFloat(0, 2*Math.PI);
+      vel = (new Vector(speed, 0)).getRotated(angle);
+    }
+    else {
+      vel = direction.getNormalized().getScaled(speed);
+    }
+
+    this.createParticle(vel, pos, color, mass, radius);
+
+  }
+
+  getParticleAmount(): number {
+    return this.particleList.length
+  }
+
+  getAvgMomentum(particleList: Ball[] = this.particleList): Vector {
+    const totalMomentum = new Vector(0, 0);
+
+    if (particleList.length === 0) {
+      return totalMomentum;
+    }
+
+    for (const particle of particleList) {
+      totalMomentum.add(particle.vel.getScaled(particle.mass))
+    }
+
+    return totalMomentum.getScaled(1/particleList.length)
+  }
+
+  getAvgKE(particleList: Ball[] = this.particleList): number {
+    if (particleList.length === 0) {
+      return 0;
+    } 
+
+    let totalKE = 0;
+    for (const particle of particleList) {
+      totalKE += 0.5 * particle.mass * (particle.vel.getMagnitude()**2);
+    }
+
+    return totalKE / particleList.length
+  }
+
+  getAvgSpeed(particleList: Ball[] = this.particleList): number {
+    if (particleList.length === 0) {
+      return 0;
+    } 
+
+    let totalSpeed = 0;
+    for (const particle of particleList) {
+      totalSpeed += particle.vel.getMagnitude();
+    }
+
+    return totalSpeed / particleList.length
+  }
+
+  // !!! Work in progress, for now is equivalent to getAvgKE
+  getTemperature(particleList: Ball[] | undefined = undefined, R_constant: number = 1): number {
+    if (particleList === undefined) {
+      particleList = this.particleList;
+    }
+    if (particleList.length === 0) {
+      return 0;
+    }
+
+    // KE_total = (3/2)nRT
+    // -> T = (2*KE_total)/(3*nR)
+    // -> T = (2/3)*KE_avg*(1/R)
+
+    const avgKE = this.getAvgKE(particleList);
+    const temperature = (1) * avgKE / R_constant
+
+    return temperature
+  }
+
+}
 
 
 // A number tied to a timestamp
@@ -358,7 +494,7 @@ let isPaused = false;
 
 let allowCollisions = true;
 let initalBallAmount = 1000
-let initialBallSpeed = 10
+let initialBallKE = 50
 let ballRadius = 7
 
 // ==== Tracking Vars ==================================
@@ -369,17 +505,11 @@ const wallImpulseTracker = new TimedNumberStack();
 
 // ==== Initial Setup ==================================
 
-const ballList: Ball[] = [];
+const defaultGas = new ParticleFluid(undefined, undefined, undefined, ballRadius);
 
 
 for (let i = 0; i < initalBallAmount; i ++) {
-  const newBall = createRandBall(initialBallSpeed, ballRadius);
-  // if (newBall.pos.x > 500) {
-  //   newBall.color = "red";
-  //   newBall.mass = 50
-  // }
- 
-  ballList.push(newBall)
+  defaultGas.createKEParticle(initialBallKE)
 }
 
 
@@ -393,34 +523,6 @@ setInterval(updateFrame, 1000 / FPS);
 
 
 // ==== UTILITY FUNCTIONS ==================================
-
-
-function getDist(vec1: Vector, vec2: Vector): number {
-  return Math.sqrt((vec1.x - vec2.x)**2 + (vec1.y - vec2.y)**2)
-}
-
-function getRandFloat(min: number, max: number) {
-  return Math.random() * (max - min) + min;
-}
-
-// Random integer from min to max inclusive
-function getRandInt(min: number, max: number) {
-  min = Math.ceil(min);
-  max = Math.floor(max);
-  return Math.floor(Math.random() * (max - min + 1)) + min;
-}
-
-function bound(value: number, min: number, max: number): number {
-  return Math.max(Math.min(value, max), min)
-}
-
-function createRandBall(speed: number = 10, radius: number = 20, mass: number = 1): Ball {
-  const angle = getRandFloat(0, 2*Math.PI);
-  const vel = new Vector(speed, 0);
-  const pos = new Vector(getRandInt(radius, canvas.width - radius), getRandInt(radius, canvas.height - radius))
-
-  return new Ball(pos, mass, radius, vel.getRotated(angle))
-}
 
 function createTimedNumber(timestamp: number, value: number): timedNumber {
   return {timestamp: timestamp, value: value};
@@ -468,77 +570,7 @@ function updateCanvasSize(prevSize: dimensions | null = null): void {
 // ==== TRACKING FUNCTIONS ==================================
 
 
-function getAvgMomentum(balls: Ball[] = ballList): Vector {
-  const totalMomentum = new Vector(0, 0);
-
-  if (balls.length === 0) {
-    return totalMomentum;
-  }
-
-  for (const ball of balls) {
-    totalMomentum.add(ball.vel.getScaled(ball.mass))
-  }
-
-  return totalMomentum.getScaled(1/balls.length)
-}
-
-function getAvgKE(balls: Ball[] = ballList): number {
-  if (balls.length === 0) {
-    return 0;
-  } 
-
-  let totalKE = 0;
-  for (const ball of balls) {
-    totalKE += 0.5 * ball.mass * (ball.vel.getMagnitude()**2);
-  }
-
-  return totalKE / balls.length
-}
-
-function getAvgSpeed(balls: Ball[] = ballList): number {
-  if (balls.length === 0) {
-    return 0;
-  } 
-
-  let totalSpeed = 0;
-  for (const ball of balls) {
-    totalSpeed += ball.vel.getMagnitude();
-  }
-
-  return totalSpeed / balls.length
-}
-
-function getAvgSpeedDev(balls: Ball[] = ballList): number {
-  if (balls.length === 0) {
-    return 0;
-  }
-
-  const avgSpeed = getAvgSpeed(balls);
-
-  let totalDev = 0;
-  for (const ball of balls) {
-    totalDev += (avgSpeed - ball.vel.getMagnitude())**2
-  }
-
-  return totalDev / balls.length;
-}
-
-function getTemperature(balls: Ball[] = ballList, R_constant: number = 1): number {
-  if (balls.length === 0) {
-    return 0;
-  }
-
-  // KE_total = (3/2)nRT
-  // -> T = (2*KE_total)/(3*nR)
-  // -> T = (2/3)*KE_avg*(1/R)
-
-  const avgKE = getAvgKE(balls);
-  const temperature = (1) * avgKE / R_constant
-
-  return temperature
-}
-
-function updateHistogram(balls: Ball[] = ballList): void {
+function updateHistogram(balls: Ball[] = defaultGas.particleList): void {
 
   const ballSpeeds: number[] = [];
   for (const ball of balls) {
@@ -579,22 +611,6 @@ function updateHistogram(balls: Ball[] = ballList): void {
 }
 
 
-// ==== OTHER FUNCTIONS ==================================
-
-function drawVector(ctx: any, posX: number, posY: number, magX: number, magY: number): void {
-  let toX = posX + magX;
-  let toY = posY + magY;
-
-  ctx.beginPath();
-  ctx.arc(posX, posY, 2, 0, 2 * Math.PI);
-  ctx.fill();
-
-  ctx.beginPath();
-  ctx.moveTo(posX, posY);
-  ctx.lineTo(toX, toY);
-  ctx.stroke();
-}
-
 // ==== DRAW FUNCTIONS ==================================
 
 
@@ -605,16 +621,16 @@ function drawFrame(): void {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 
   // Draw balls
-  for (const ball of ballList) {
+  for (const ball of defaultGas.particleList) {
     ball.draw(ctx);
   }
 
 }
 
 function updateUI(): void {
-  updateHistogram(ballList);
+  updateHistogram(defaultGas.particleList);
 
-  const avgingWindow = bound(wallImpulseTracker.getTimeWindow(), 1, 20);
+  const avgingWindow = Utils.bound(wallImpulseTracker.getTimeWindow(), 1, 20);
 
   const volume = canvas.width*canvas.height;
   const area = 2*(canvas.width + canvas.height);
@@ -622,9 +638,9 @@ function updateUI(): void {
   const pressure = impulsePerFrame / area;
 
   volumeReading!.innerText = volume.toString();
-  amountReading!.innerText = ballList.length.toString();
-  temperatureReading!.innerText = getTemperature(ballList).toFixed(2).toString();
-  avgKEReading!.innerText = getAvgKE(ballList).toFixed(2).toString();
+  amountReading!.innerText = defaultGas.getParticleAmount().toString();
+  temperatureReading!.innerText = defaultGas.getTemperature().toFixed(2).toString();
+  avgKEReading!.innerText = defaultGas.getAvgKE().toFixed(2).toString();
   pressureReading!.innerText = pressure.toFixed(5).toString();
 }
 
@@ -641,17 +657,17 @@ function updateFrame(): void {
   frameNum += 1
 
   // Update balls position
-  for (const ball of ballList) {
+  for (const ball of defaultGas.particleList) {
     // ball.applyGravity();
     ball.updatePosition();
     ball.applyWallCollision();
   }
 
   // Loops through every pair of balls without duplicates
-  for (let i = 0; i < ballList.length; i ++) {
-    for (let j = i + 1; j < ballList.length; j ++) {
-      const ball1 = ballList[i];
-      const ball2 = ballList[j];
+  for (let i = 0; i < defaultGas.particleList.length; i ++) {
+    for (let j = i + 1; j < defaultGas.particleList.length; j ++) {
+      const ball1 = defaultGas.particleList[i];
+      const ball2 = defaultGas.particleList[j];
 
       if (allowCollisions) {
         ball1.attemptBallCollision(ball2);
@@ -669,10 +685,7 @@ function updateFrame(): void {
 canvas.addEventListener("mousedown", function (e) {
   const mousePos = getCursorPosition(e);
 
-  const ball = new Ball(mousePos);
-  
-  ballList.push(ball);
-
+  defaultGas.createParticle(new Vector(0, 0), mousePos, "red", undefined, 15)
 });
 
 document.addEventListener("keydown", function (e) {

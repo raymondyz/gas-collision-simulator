@@ -1,6 +1,28 @@
 // ==================================================================================================
 // ==== Classes =====================================================================================
 // ==================================================================================================
+var Utils = /** @class */ (function () {
+    function Utils() {
+    }
+    Utils.getDist = function (vec1, vec2) {
+        return Math.sqrt(Math.pow((vec1.x - vec2.x), 2) + Math.pow((vec1.y - vec2.y), 2));
+    };
+    Utils.getRandFloat = function (min, max) {
+        return Math.random() * (max - min) + min;
+    };
+    // Random integer from min to max inclusive
+    Utils.getRandInt = function (min, max) {
+        min = Math.ceil(min);
+        max = Math.floor(max);
+        return Math.floor(Math.random() * (max - min + 1)) + min;
+    };
+    Utils.bound = function (value, bound1, bound2) {
+        var max = Math.max(bound1, bound2);
+        var min = Math.min(bound1, bound2);
+        return Math.max(Math.min(value, max), min);
+    };
+    return Utils;
+}());
 var Vector = /** @class */ (function () {
     function Vector(x, y) {
         if (x === void 0) { x = 1; }
@@ -71,15 +93,16 @@ var Vector = /** @class */ (function () {
     return Vector;
 }());
 var Ball = /** @class */ (function () {
-    function Ball(pos, mass, radius, vel) {
+    function Ball(pos, mass, radius, vel, color) {
         if (mass === void 0) { mass = 1; }
         if (radius === void 0) { radius = 20; }
         if (vel === void 0) { vel = new Vector(0, 0); }
+        if (color === void 0) { color = "black"; }
         this.pos = pos;
         this.vel = vel;
         this.mass = mass;
         this.radius = radius;
-        this.color = "black";
+        this.color = color;
     }
     Ball.prototype.draw = function (ctx) {
         ctx.fillStyle = this.color;
@@ -162,7 +185,7 @@ var Ball = /** @class */ (function () {
     // Collides balls if within reach and moving in correct direction
     Ball.prototype.attemptBallCollision = function (other) {
         // Ignore if balls are not touching
-        if (getDist(this.pos, other.pos) >= this.radius + other.radius) {
+        if (Utils.getDist(this.pos, other.pos) >= this.radius + other.radius) {
             return;
         }
         // If balls have exact same pos, offset a bit
@@ -178,6 +201,121 @@ var Ball = /** @class */ (function () {
         this.ballCollide(other);
     };
     return Ball;
+}());
+var ParticleFluid = /** @class */ (function () {
+    function ParticleFluid(particleList, color, mass, radius) {
+        if (particleList === void 0) { particleList = []; }
+        if (color === void 0) { color = "black"; }
+        if (mass === void 0) { mass = 1; }
+        if (radius === void 0) { radius = 7; }
+        this.particleList = particleList;
+        this.color = color;
+        this.mass = mass;
+        this.radius = radius;
+    }
+    ParticleFluid.prototype.createParticle = function (vel, pos, color, mass, radius) {
+        if (vel === void 0) { vel = undefined; }
+        if (pos === void 0) { pos = undefined; }
+        if (color === void 0) { color = undefined; }
+        if (mass === void 0) { mass = undefined; }
+        if (radius === void 0) { radius = undefined; }
+        if (radius === undefined) {
+            radius = this.radius;
+        }
+        if (pos === undefined) {
+            pos = new Vector(Utils.getRandInt(radius, canvas.width - radius), Utils.getRandInt(radius, canvas.height - radius));
+        }
+        if (vel === undefined) {
+            vel = new Vector(0, 0);
+        }
+        if (color === undefined) {
+            color = this.color;
+        }
+        if (mass === undefined) {
+            mass = this.mass;
+        }
+        var particle = new Ball(pos, mass, radius, vel, color);
+        this.particleList.push(particle);
+    };
+    ParticleFluid.prototype.createKEParticle = function (KE, pos, direction, color, mass, radius) {
+        if (pos === void 0) { pos = undefined; }
+        if (direction === void 0) { direction = undefined; }
+        if (color === void 0) { color = undefined; }
+        if (mass === void 0) { mass = undefined; }
+        if (radius === void 0) { radius = undefined; }
+        if (mass === undefined) {
+            mass = this.mass;
+        }
+        // KE = 0.5 * m * (v**2)
+        // v = sqrt(2 * KE / m)
+        var speed = Math.sqrt(2 * KE / mass);
+        var vel;
+        if (direction === undefined) {
+            var angle = Utils.getRandFloat(0, 2 * Math.PI);
+            vel = (new Vector(speed, 0)).getRotated(angle);
+        }
+        else {
+            vel = direction.getNormalized().getScaled(speed);
+        }
+        this.createParticle(vel, pos, color, mass, radius);
+    };
+    ParticleFluid.prototype.getParticleAmount = function () {
+        return this.particleList.length;
+    };
+    ParticleFluid.prototype.getAvgMomentum = function (particleList) {
+        if (particleList === void 0) { particleList = this.particleList; }
+        var totalMomentum = new Vector(0, 0);
+        if (particleList.length === 0) {
+            return totalMomentum;
+        }
+        for (var _i = 0, particleList_1 = particleList; _i < particleList_1.length; _i++) {
+            var particle = particleList_1[_i];
+            totalMomentum.add(particle.vel.getScaled(particle.mass));
+        }
+        return totalMomentum.getScaled(1 / particleList.length);
+    };
+    ParticleFluid.prototype.getAvgKE = function (particleList) {
+        if (particleList === void 0) { particleList = this.particleList; }
+        if (particleList.length === 0) {
+            return 0;
+        }
+        var totalKE = 0;
+        for (var _i = 0, particleList_2 = particleList; _i < particleList_2.length; _i++) {
+            var particle = particleList_2[_i];
+            totalKE += 0.5 * particle.mass * (Math.pow(particle.vel.getMagnitude(), 2));
+        }
+        return totalKE / particleList.length;
+    };
+    ParticleFluid.prototype.getAvgSpeed = function (particleList) {
+        if (particleList === void 0) { particleList = this.particleList; }
+        if (particleList.length === 0) {
+            return 0;
+        }
+        var totalSpeed = 0;
+        for (var _i = 0, particleList_3 = particleList; _i < particleList_3.length; _i++) {
+            var particle = particleList_3[_i];
+            totalSpeed += particle.vel.getMagnitude();
+        }
+        return totalSpeed / particleList.length;
+    };
+    // !!! Work in progress, for now is equivalent to getAvgKE
+    ParticleFluid.prototype.getTemperature = function (particleList, R_constant) {
+        if (particleList === void 0) { particleList = undefined; }
+        if (R_constant === void 0) { R_constant = 1; }
+        if (particleList === undefined) {
+            particleList = this.particleList;
+        }
+        if (particleList.length === 0) {
+            return 0;
+        }
+        // KE_total = (3/2)nRT
+        // -> T = (2*KE_total)/(3*nR)
+        // -> T = (2/3)*KE_avg*(1/R)
+        var avgKE = this.getAvgKE(particleList);
+        var temperature = (1) * avgKE / R_constant;
+        return temperature;
+    };
+    return ParticleFluid;
 }());
 // A stack of timed numbers
 // !!! Timed numbers must be added in chronological order
@@ -260,20 +398,15 @@ updateCanvasSize();
 var isPaused = false;
 var allowCollisions = true;
 var initalBallAmount = 1000;
-var initialBallSpeed = 10;
+var initialBallKE = 50;
 var ballRadius = 7;
 // ==== Tracking Vars ==================================
 var frameNum = 0;
 var wallImpulseTracker = new TimedNumberStack();
 // ==== Initial Setup ==================================
-var ballList = [];
+var defaultGas = new ParticleFluid(undefined, undefined, undefined, ballRadius);
 for (var i = 0; i < initalBallAmount; i++) {
-    var newBall = createRandBall(initialBallSpeed, ballRadius);
-    // if (newBall.pos.x > 500) {
-    //   newBall.color = "red";
-    //   newBall.mass = 50
-    // }
-    ballList.push(newBall);
+    defaultGas.createKEParticle(initialBallKE);
 }
 // Set frame rate
 setInterval(updateFrame, 1000 / FPS);
@@ -281,30 +414,6 @@ setInterval(updateFrame, 1000 / FPS);
 // ==== Functions ===================================================================================
 // ==================================================================================================
 // ==== UTILITY FUNCTIONS ==================================
-function getDist(vec1, vec2) {
-    return Math.sqrt(Math.pow((vec1.x - vec2.x), 2) + Math.pow((vec1.y - vec2.y), 2));
-}
-function getRandFloat(min, max) {
-    return Math.random() * (max - min) + min;
-}
-// Random integer from min to max inclusive
-function getRandInt(min, max) {
-    min = Math.ceil(min);
-    max = Math.floor(max);
-    return Math.floor(Math.random() * (max - min + 1)) + min;
-}
-function bound(value, min, max) {
-    return Math.max(Math.min(value, max), min);
-}
-function createRandBall(speed, radius, mass) {
-    if (speed === void 0) { speed = 10; }
-    if (radius === void 0) { radius = 20; }
-    if (mass === void 0) { mass = 1; }
-    var angle = getRandFloat(0, 2 * Math.PI);
-    var vel = new Vector(speed, 0);
-    var pos = new Vector(getRandInt(radius, canvas.width - radius), getRandInt(radius, canvas.height - radius));
-    return new Ball(pos, mass, radius, vel.getRotated(angle));
-}
 function createTimedNumber(timestamp, value) {
     return { timestamp: timestamp, value: value };
 }
@@ -338,73 +447,11 @@ function updateCanvasSize(prevSize) {
     }
 }
 // ==== TRACKING FUNCTIONS ==================================
-function getAvgMomentum(balls) {
-    if (balls === void 0) { balls = ballList; }
-    var totalMomentum = new Vector(0, 0);
-    if (balls.length === 0) {
-        return totalMomentum;
-    }
+function updateHistogram(balls) {
+    if (balls === void 0) { balls = defaultGas.particleList; }
+    var ballSpeeds = [];
     for (var _i = 0, balls_1 = balls; _i < balls_1.length; _i++) {
         var ball = balls_1[_i];
-        totalMomentum.add(ball.vel.getScaled(ball.mass));
-    }
-    return totalMomentum.getScaled(1 / balls.length);
-}
-function getAvgKE(balls) {
-    if (balls === void 0) { balls = ballList; }
-    if (balls.length === 0) {
-        return 0;
-    }
-    var totalKE = 0;
-    for (var _i = 0, balls_2 = balls; _i < balls_2.length; _i++) {
-        var ball = balls_2[_i];
-        totalKE += 0.5 * ball.mass * (Math.pow(ball.vel.getMagnitude(), 2));
-    }
-    return totalKE / balls.length;
-}
-function getAvgSpeed(balls) {
-    if (balls === void 0) { balls = ballList; }
-    if (balls.length === 0) {
-        return 0;
-    }
-    var totalSpeed = 0;
-    for (var _i = 0, balls_3 = balls; _i < balls_3.length; _i++) {
-        var ball = balls_3[_i];
-        totalSpeed += ball.vel.getMagnitude();
-    }
-    return totalSpeed / balls.length;
-}
-function getAvgSpeedDev(balls) {
-    if (balls === void 0) { balls = ballList; }
-    if (balls.length === 0) {
-        return 0;
-    }
-    var avgSpeed = getAvgSpeed(balls);
-    var totalDev = 0;
-    for (var _i = 0, balls_4 = balls; _i < balls_4.length; _i++) {
-        var ball = balls_4[_i];
-        totalDev += Math.pow((avgSpeed - ball.vel.getMagnitude()), 2);
-    }
-    return totalDev / balls.length;
-}
-function getTemperature(balls, R_constant) {
-    if (balls === void 0) { balls = ballList; }
-    if (R_constant === void 0) { R_constant = 1; }
-    if (balls.length === 0) {
-        return 0;
-    }
-    // KE_total = (3/2)nRT
-    // -> T = (2*KE_total)/(3*nR)
-    // -> T = (2/3)*KE_avg*(1/R)
-    var avgKE = getAvgKE(balls);
-    var temperature = (1) * avgKE / R_constant;
-    return temperature;
-}
-function updateHistogram(balls) {
-    if (balls === void 0) { balls = ballList; }
-    var ballSpeeds = [];
-    for (var _i = 0, balls_5 = balls; _i < balls_5.length; _i++) {
-        var ball = balls_5[_i];
         ballSpeeds.push(ball.vel.getMagnitude());
     }
     var trace = {
@@ -436,40 +483,28 @@ function updateHistogram(balls) {
     // @ts-ignore
     Plotly.newPlot('histogram1', data, layout);
 }
-// ==== OTHER FUNCTIONS ==================================
-function drawVector(ctx, posX, posY, magX, magY) {
-    var toX = posX + magX;
-    var toY = posY + magY;
-    ctx.beginPath();
-    ctx.arc(posX, posY, 2, 0, 2 * Math.PI);
-    ctx.fill();
-    ctx.beginPath();
-    ctx.moveTo(posX, posY);
-    ctx.lineTo(toX, toY);
-    ctx.stroke();
-}
 // ==== DRAW FUNCTIONS ==================================
 function drawFrame() {
     updateCanvasSize(canvasSize);
     // Clear canvas
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     // Draw balls
-    for (var _i = 0, ballList_1 = ballList; _i < ballList_1.length; _i++) {
-        var ball = ballList_1[_i];
+    for (var _i = 0, _a = defaultGas.particleList; _i < _a.length; _i++) {
+        var ball = _a[_i];
         ball.draw(ctx);
     }
 }
 function updateUI() {
-    updateHistogram(ballList);
-    var avgingWindow = bound(wallImpulseTracker.getTimeWindow(), 1, 20);
+    updateHistogram(defaultGas.particleList);
+    var avgingWindow = Utils.bound(wallImpulseTracker.getTimeWindow(), 1, 20);
     var volume = canvas.width * canvas.height;
     var area = 2 * (canvas.width + canvas.height);
     var impulsePerFrame = wallImpulseTracker.sumNewEntries(frameNum - avgingWindow) / avgingWindow;
     var pressure = impulsePerFrame / area;
     volumeReading.innerText = volume.toString();
-    amountReading.innerText = ballList.length.toString();
-    temperatureReading.innerText = getTemperature(ballList).toFixed(2).toString();
-    avgKEReading.innerText = getAvgKE(ballList).toFixed(2).toString();
+    amountReading.innerText = defaultGas.getParticleAmount().toString();
+    temperatureReading.innerText = defaultGas.getTemperature().toFixed(2).toString();
+    avgKEReading.innerText = defaultGas.getAvgKE().toFixed(2).toString();
     pressureReading.innerText = pressure.toFixed(5).toString();
 }
 function updateFrame() {
@@ -482,17 +517,17 @@ function updateFrame() {
     // Tracking
     frameNum += 1;
     // Update balls position
-    for (var _i = 0, ballList_2 = ballList; _i < ballList_2.length; _i++) {
-        var ball = ballList_2[_i];
+    for (var _i = 0, _a = defaultGas.particleList; _i < _a.length; _i++) {
+        var ball = _a[_i];
         // ball.applyGravity();
         ball.updatePosition();
         ball.applyWallCollision();
     }
     // Loops through every pair of balls without duplicates
-    for (var i = 0; i < ballList.length; i++) {
-        for (var j = i + 1; j < ballList.length; j++) {
-            var ball1 = ballList[i];
-            var ball2 = ballList[j];
+    for (var i = 0; i < defaultGas.particleList.length; i++) {
+        for (var j = i + 1; j < defaultGas.particleList.length; j++) {
+            var ball1 = defaultGas.particleList[i];
+            var ball2 = defaultGas.particleList[j];
             if (allowCollisions) {
                 ball1.attemptBallCollision(ball2);
             }
@@ -504,8 +539,7 @@ function updateFrame() {
 // ==================================================================================================
 canvas.addEventListener("mousedown", function (e) {
     var mousePos = getCursorPosition(e);
-    var ball = new Ball(mousePos);
-    ballList.push(ball);
+    defaultGas.createParticle(new Vector(0, 0), mousePos, "red", undefined, 15);
 });
 document.addEventListener("keydown", function (e) {
     if (e.key === " ") {
