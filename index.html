@@ -7,42 +7,52 @@
     <link rel="stylesheet" href="style.css" />
   </head>
   <body>
-    <div id="canvas-resizer">
-      <canvas id="myCanvas"></canvas>
-    </div>
-    <div class="ui-container">
-      <div>"Volume" (Area): <span id="volume-reading"></span></div>
-      <div># of Particles: <span id="amount-reading"></span></div>
-      <div>Temperature: <span id="temperature-reading"></span></div>
-      <div>Average KE: <span id="avg-ke-reading"></span></div>
-      <br />
-      <div>Pressure: <span id="pressure-reading"></span></div>
-      <br />
-      <form id="canvas-resize-form">
-        <label for="height-input">Height:</label>
-        <input
-          type="number"
-          id="height-input"
-          name="height"
-          autocomplete="off"
-          min="0"
-          max="10000"
-        />
-        <br />
-        <label for="width-input">Width:</label>
-        <input
-          type="number"
-          id="width-input"
-          name="width"
-          autocomplete="off"
-          min="0"
-          max="10000"
-        />
-        <br />
-        <input type="submit" value="Submit" />
-      </form>
-      <br />
-      <div id="histogram1" style="width: 700px; height: 500px"></div>
+    <a href="/"><button id="back-button">Back</button></a>
+    <div class="main-container">
+      <div id="canvas-resizer">
+        <canvas id="myCanvas"></canvas>
+      </div>
+      <div>
+        <h1>Gas Particle Simulator</h1>
+        <div class="ui-container">
+          <div class="controls-container">
+            <form id="canvas-resize-form">
+              <div class="resize-form-row">
+                <label for="height-input">Height:</label>
+                <input
+                  type="number"
+                  id="height-input"
+                  name="height"
+                  autocomplete="off"
+                  min="0"
+                  max="10000"
+                />
+              </div>
+              <div class="resize-form-row">
+                <label for="width-input">Width:</label>
+                <input
+                  type="number"
+                  id="width-input"
+                  name="width"
+                  autocomplete="off"
+                  min="0"
+                  max="10000"
+                />
+              </div>
+              <input type="submit" value="Resize" />
+            </form>
+            <button id="pause-button">Pause</button>
+          </div>
+          <div class="readings-container">
+            <h4># of Particles: <span id="amount-reading"></span></h4>
+            <h4>Volume: <span id="volume-reading"></span></h4>
+            <h4>Temperature: <span id="temperature-reading"></span></h4>
+            <h4>Average KE: <span id="avg-ke-reading"></span></h4>
+            <h4>Pressure: <span id="pressure-reading"></span></h4>
+          </div>
+        </div>
+        <div id="histogram1" style="width: 700px; height: 500px"></div>
+      </div>
     </div>
 
     <script src="https://cdn.plot.ly/plotly-3.0.1.min.js"></script>

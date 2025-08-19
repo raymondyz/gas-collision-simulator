@@ -470,6 +470,7 @@ const canvas: any = document.getElementById("myCanvas");
 const ctx = canvas.getContext("2d");
 
 const canvasResizer: any = document.getElementById("canvas-resizer");
+const pauseButton: any = document.getElementById("pause-button");
 
 const volumeReading = document.getElementById("volume-reading");
 const amountReading = document.getElementById("amount-reading");
@@ -607,7 +608,7 @@ function updateHistogram(balls: Ball[] = defaultGas.particleList): void {
   const data = [trace];
   
   // @ts-ignore
-  Plotly.newPlot('histogram1', data, layout);
+  Plotly.newPlot('histogram1', data, layout, { displayModeBar: false });
 }
 
 
@@ -680,6 +681,17 @@ function updateFrame(): void {
 // ==================================================================================================
 // ==== EVENT HANDLERS ==============================================================================
 // ==================================================================================================
+
+pauseButton.onclick = function() {
+  if (isPaused) {
+    isPaused = false
+    pauseButton.innerText = "Pause"
+  }
+  else {
+    isPaused = true
+    pauseButton.innerText = "Unpause"
+  }
+}
 
 
 canvas.addEventListener("mousedown", function (e) {

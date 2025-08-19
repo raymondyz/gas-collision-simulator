@@ -382,6 +382,7 @@ var TimedNumberStack = /** @class */ (function () {
 var canvas = document.getElementById("myCanvas");
 var ctx = canvas.getContext("2d");
 var canvasResizer = document.getElementById("canvas-resizer");
+var pauseButton = document.getElementById("pause-button");
 var volumeReading = document.getElementById("volume-reading");
 var amountReading = document.getElementById("amount-reading");
 var temperatureReading = document.getElementById("temperature-reading");
@@ -481,7 +482,7 @@ function updateHistogram(balls) {
     };
     var data = [trace];
     // @ts-ignore
-    Plotly.newPlot('histogram1', data, layout);
+    Plotly.newPlot('histogram1', data, layout, { displayModeBar: false });
 }
 // ==== DRAW FUNCTIONS ==================================
 function drawFrame() {
@@ -537,6 +538,16 @@ function updateFrame() {
 // ==================================================================================================
 // ==== EVENT HANDLERS ==============================================================================
 // ==================================================================================================
+pauseButton.onclick = function () {
+    if (isPaused) {
+        isPaused = false;
+        pauseButton.innerText = "Pause";
+    }
+    else {
+        isPaused = true;
+        pauseButton.innerText = "Unpause";
+    }
+};
 canvas.addEventListener("mousedown", function (e) {
     var mousePos = getCursorPosition(e);
     defaultGas.createParticle(new Vector(0, 0), mousePos, "red", undefined, 15);
