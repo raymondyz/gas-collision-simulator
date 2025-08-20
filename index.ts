@@ -71,6 +71,7 @@ class Vector {
     return new Vector(other.x - this.x, other.y - this.y);
   }
   
+  // !!! Ignores zero vectors
   getNormalized(): Vector {
     const mag = this.getMagnitude();
   
@@ -82,6 +83,7 @@ class Vector {
     return new Vector(this.x / mag, this.y / mag);
   }
 
+  // !!! Ignores zero vectors
   normalize(): void {
     const mag = this.getMagnitude();
 
@@ -99,9 +101,12 @@ class Vector {
   }
   
   // Returns current vector projected onto a basis vector
-  // (function automatically normalizes basis vector)
+  // (basis vector does not need to be unit length)
   getProjection(basis: Vector): Vector {
-    const newMag = this.getDotProduct(basis)// / basis.getMagnitude()**2
+    if (basis.getMagnitude() === 0) {
+      console.error("Cannot project onto a zero basis vector")
+    }
+    const newMag = this.getDotProduct(basis) / basis.getMagnitude()**2
     
     return basis.getScaled(newMag)
   }

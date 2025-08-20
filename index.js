@@ -58,6 +58,7 @@ var Vector = /** @class */ (function () {
     Vector.prototype.getDifference = function (other) {
         return new Vector(other.x - this.x, other.y - this.y);
     };
+    // !!! Ignores zero vectors
     Vector.prototype.getNormalized = function () {
         var mag = this.getMagnitude();
         // Return <0,0> if input is zero vector
@@ -66,6 +67,7 @@ var Vector = /** @class */ (function () {
         }
         return new Vector(this.x / mag, this.y / mag);
     };
+    // !!! Ignores zero vectors
     Vector.prototype.normalize = function () {
         var mag = this.getMagnitude();
         // Do nothing if zero vector
@@ -79,9 +81,12 @@ var Vector = /** @class */ (function () {
         return this.x * other.x + this.y * other.y;
     };
     // Returns current vector projected onto a basis vector
-    // (function automatically normalizes basis vector)
+    // (basis vector does not need to be unit length)
     Vector.prototype.getProjection = function (basis) {
-        var newMag = this.getDotProduct(basis); // / basis.getMagnitude()**2
+        if (basis.getMagnitude() === 0) {
+            console.error("Cannot project onto a zero basis vector");
+        }
+        var newMag = this.getDotProduct(basis) / Math.pow(basis.getMagnitude(), 2);
         return basis.getScaled(newMag);
     };
     // Input: angle in radians
