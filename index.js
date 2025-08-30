@@ -1,6 +1,21 @@
-// ==================================================================================================
-// ==== Classes =====================================================================================
-// ==================================================================================================
+// =================================================================================================
+// ==== Classes ====================================================================================
+// =================================================================================================
+var __extends = (this && this.__extends) || (function () {
+    var extendStatics = function (d, b) {
+        extendStatics = Object.setPrototypeOf ||
+            ({ __proto__: [] } instanceof Array && function (d, b) { d.__proto__ = b; }) ||
+            function (d, b) { for (var p in b) if (Object.prototype.hasOwnProperty.call(b, p)) d[p] = b[p]; };
+        return extendStatics(d, b);
+    };
+    return function (d, b) {
+        if (typeof b !== "function" && b !== null)
+            throw new TypeError("Class extends value " + String(b) + " is not a constructor or null");
+        extendStatics(d, b);
+        function __() { this.constructor = d; }
+        d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
+    };
+})();
 var Utils = /** @class */ (function () {
     function Utils() {
     }
@@ -25,10 +40,8 @@ var Utils = /** @class */ (function () {
 }());
 var Vector = /** @class */ (function () {
     function Vector(x, y) {
-        if (x === void 0) { x = 1; }
-        if (y === void 0) { y = 1; }
-        this.x = x;
-        this.y = y;
+        this.x = x !== null && x !== void 0 ? x : 1;
+        this.y = y !== null && y !== void 0 ? y : 1;
     }
     Vector.prototype.getCopy = function () {
         return new Vector(this.x, this.y);
@@ -99,15 +112,11 @@ var Vector = /** @class */ (function () {
 }());
 var Ball = /** @class */ (function () {
     function Ball(pos, mass, radius, vel, color) {
-        if (mass === void 0) { mass = 1; }
-        if (radius === void 0) { radius = 20; }
-        if (vel === void 0) { vel = new Vector(0, 0); }
-        if (color === void 0) { color = "black"; }
         this.pos = pos;
-        this.vel = vel;
-        this.mass = mass;
-        this.radius = radius;
-        this.color = color;
+        this.vel = vel !== null && vel !== void 0 ? vel : new Vector(0, 0);
+        this.mass = mass !== null && mass !== void 0 ? mass : 1;
+        this.radius = radius !== null && radius !== void 0 ? radius : 20;
+        this.color = color !== null && color !== void 0 ? color : "black";
     }
     Ball.prototype.draw = function (ctx) {
         ctx.fillStyle = this.color;
@@ -193,7 +202,7 @@ var Ball = /** @class */ (function () {
         if (Utils.getDist(this.pos, other.pos) >= this.radius + other.radius) {
             return;
         }
-        // If balls have exact same pos, offset a bit
+        // If balls have exact same pos, offset a bit to avoid division by zero
         if (this.pos.x === other.pos.x && this.pos.y === other.pos.y) {
             this.pos.x += 0.00001;
         }
@@ -209,48 +218,22 @@ var Ball = /** @class */ (function () {
 }());
 var ParticleFluid = /** @class */ (function () {
     function ParticleFluid(particleList, color, mass, radius) {
-        if (particleList === void 0) { particleList = []; }
-        if (color === void 0) { color = "black"; }
-        if (mass === void 0) { mass = 1; }
-        if (radius === void 0) { radius = 7; }
-        this.particleList = particleList;
-        this.color = color;
-        this.mass = mass;
-        this.radius = radius;
+        this.particleList = particleList !== null && particleList !== void 0 ? particleList : [];
+        this.color = color !== null && color !== void 0 ? color : "black";
+        this.mass = mass !== null && mass !== void 0 ? mass : 1;
+        this.radius = radius !== null && radius !== void 0 ? radius : 7;
     }
     ParticleFluid.prototype.createParticle = function (vel, pos, color, mass, radius) {
-        if (vel === void 0) { vel = undefined; }
-        if (pos === void 0) { pos = undefined; }
-        if (color === void 0) { color = undefined; }
-        if (mass === void 0) { mass = undefined; }
-        if (radius === void 0) { radius = undefined; }
-        if (radius === undefined) {
-            radius = this.radius;
-        }
-        if (pos === undefined) {
-            pos = new Vector(Utils.getRandInt(radius, canvas.width - radius), Utils.getRandInt(radius, canvas.height - radius));
-        }
-        if (vel === undefined) {
-            vel = new Vector(0, 0);
-        }
-        if (color === undefined) {
-            color = this.color;
-        }
-        if (mass === undefined) {
-            mass = this.mass;
-        }
+        radius = radius !== null && radius !== void 0 ? radius : this.radius;
+        pos = pos !== null && pos !== void 0 ? pos : new Vector(Utils.getRandInt(radius, canvas.width - radius), Utils.getRandInt(radius, canvas.height - radius));
+        vel = vel !== null && vel !== void 0 ? vel : new Vector(0, 0);
+        color = color !== null && color !== void 0 ? color : this.color;
+        mass = mass !== null && mass !== void 0 ? mass : this.mass;
         var particle = new Ball(pos, mass, radius, vel, color);
         this.particleList.push(particle);
     };
     ParticleFluid.prototype.createKEParticle = function (KE, pos, direction, color, mass, radius) {
-        if (pos === void 0) { pos = undefined; }
-        if (direction === void 0) { direction = undefined; }
-        if (color === void 0) { color = undefined; }
-        if (mass === void 0) { mass = undefined; }
-        if (radius === void 0) { radius = undefined; }
-        if (mass === undefined) {
-            mass = this.mass;
-        }
+        mass = mass !== null && mass !== void 0 ? mass : this.mass;
         // KE = 0.5 * m * (v**2)
         // v = sqrt(2 * KE / m)
         var speed = Math.sqrt(2 * KE / mass);
@@ -264,7 +247,7 @@ var ParticleFluid = /** @class */ (function () {
         }
         this.createParticle(vel, pos, color, mass, radius);
     };
-    ParticleFluid.prototype.getParticleAmount = function () {
+    ParticleFluid.prototype.getParticleCount = function () {
         return this.particleList.length;
     };
     ParticleFluid.prototype.getAvgMomentum = function (particleList) {
@@ -305,11 +288,8 @@ var ParticleFluid = /** @class */ (function () {
     };
     // !!! Work in progress, for now is equivalent to getAvgKE
     ParticleFluid.prototype.getTemperature = function (particleList, R_constant) {
-        if (particleList === void 0) { particleList = undefined; }
         if (R_constant === void 0) { R_constant = 1; }
-        if (particleList === undefined) {
-            particleList = this.particleList;
-        }
+        particleList = particleList !== null && particleList !== void 0 ? particleList : this.particleList;
         if (particleList.length === 0) {
             return 0;
         }
@@ -320,15 +300,36 @@ var ParticleFluid = /** @class */ (function () {
         var temperature = (1) * avgKE / R_constant;
         return temperature;
     };
+    // Adds/removes particles until count is met
+    ParticleFluid.prototype.setParticleCount = function (count, newParticleKE) {
+        if (count < 0) {
+            return;
+        }
+        // Add if under, remove if over, left with wanted count
+        while (this.getParticleCount() < count) {
+            this.createKEParticle(newParticleKE);
+        }
+        while (this.getParticleCount() > count) {
+            this.particleList.pop();
+        }
+        // Side note: Thanks Shun Akiyama, what a cool way to get the right count!
+    };
     return ParticleFluid;
 }());
+var TracerBall = /** @class */ (function (_super) {
+    __extends(TracerBall, _super);
+    function TracerBall(pos, mass, radius, vel, color) {
+        return _super.call(this, pos, mass, radius, vel, color) || this;
+    }
+    return TracerBall;
+}(Ball));
+console.log(new TracerBall(new Vector(0, 0), 1, 1));
 // A stack of timed numbers
 // !!! Timed numbers must be added in chronological order
 var TimedNumberStack = /** @class */ (function () {
-    function TimedNumberStack(maxAmount) {
-        if (maxAmount === void 0) { maxAmount = 10000; }
+    function TimedNumberStack(maxCount) {
         this.entryList = [];
-        this.maxAmount = maxAmount;
+        this.maxCount = maxCount !== null && maxCount !== void 0 ? maxCount : 10000;
     }
     TimedNumberStack.prototype.getTimeWindow = function () {
         if (this.entryList.length < 2) {
@@ -343,7 +344,7 @@ var TimedNumberStack = /** @class */ (function () {
             return;
         }
         this.entryList.push(entry);
-        if (this.entryList.length > this.maxAmount) {
+        if (this.entryList.length > this.maxCount) {
             this.entryList.shift();
         }
     };
@@ -381,21 +382,26 @@ var TimedNumberStack = /** @class */ (function () {
     };
     return TimedNumberStack;
 }());
-// ==================================================================================================
-// ==== Main Code ===================================================================================
-// ==================================================================================================
+// =================================================================================================
+// ==== Main Code ==================================================================================
+// =================================================================================================
 var canvas = document.getElementById("myCanvas");
 var ctx = canvas.getContext("2d");
+// Inputs
 var canvasResizer = document.getElementById("canvas-resizer");
-var pauseButton = document.getElementById("pause-button");
-var volumeReading = document.getElementById("volume-reading");
-var amountReading = document.getElementById("amount-reading");
-var temperatureReading = document.getElementById("temperature-reading");
-var pressureReading = document.getElementById("pressure-reading");
-var avgKEReading = document.getElementById("avg-ke-reading");
 var canvasResizeForm = document.getElementById("canvas-resize-form");
 var heightInput = document.getElementById("height-input");
 var widthInput = document.getElementById("width-input");
+var particleCountForm = document.getElementById("particle-count-form");
+var particleCountInput = document.getElementById("particle-count-input");
+var particleCountSlider = document.getElementById("particle-count-slider");
+// Readings
+var volumeReading = document.getElementById("volume-reading");
+var particleCountReading = document.getElementById("particle-count-reading");
+var temperatureReading = document.getElementById("temperature-reading");
+var pressureReading = document.getElementById("pressure-reading");
+var avgKEReading = document.getElementById("avg-ke-reading");
+// Consts
 var CANVAS_RECT = canvas.getBoundingClientRect();
 var FPS = 20;
 var canvasSize;
@@ -403,22 +409,23 @@ updateCanvasSize();
 // ==== Global Vars ==================================
 var isPaused = false;
 var allowCollisions = true;
-var initalBallAmount = 1000;
-var initialBallKE = 50;
+var initalBallCount = 1000;
+var initialBallKE = 100;
 var ballRadius = 7;
 // ==== Tracking Vars ==================================
 var frameNum = 0;
 var wallImpulseTracker = new TimedNumberStack();
 // ==== Initial Setup ==================================
 var defaultGas = new ParticleFluid(undefined, undefined, undefined, ballRadius);
-for (var i = 0; i < initalBallAmount; i++) {
+for (var i = 0; i < initalBallCount; i++) {
     defaultGas.createKEParticle(initialBallKE);
 }
+updateParticleCount();
 // Set frame rate
 setInterval(updateFrame, 1000 / FPS);
-// ==================================================================================================
-// ==== Functions ===================================================================================
-// ==================================================================================================
+// =================================================================================================
+// ==== Functions ==================================================================================
+// =================================================================================================
 // ==== UTILITY FUNCTIONS ==================================
 function createTimedNumber(timestamp, value) {
     return { timestamp: timestamp, value: value };
@@ -447,10 +454,14 @@ function resizeCanvas(newSize) {
     console.log("Container Resized!");
 }
 function updateCanvasSize(prevSize) {
-    if (prevSize === void 0) { prevSize = null; }
-    if (prevSize === null || prevSize.height !== canvas.clientHeight || prevSize.width !== canvas.clientWidth) {
+    if (prevSize === undefined || prevSize.height !== canvas.clientHeight || prevSize.width !== canvas.clientWidth) {
         resizeCanvas({ height: canvas.clientHeight, width: canvas.clientWidth });
     }
+}
+function updateParticleCount() {
+    particleCountInput.placeholder = defaultGas.getParticleCount();
+    particleCountInput.value = "";
+    particleCountSlider.value = defaultGas.getParticleCount();
 }
 // ==== TRACKING FUNCTIONS ==================================
 function updateHistogram(balls) {
@@ -507,8 +518,9 @@ function updateUI() {
     var area = 2 * (canvas.width + canvas.height);
     var impulsePerFrame = wallImpulseTracker.sumNewEntries(frameNum - avgingWindow) / avgingWindow;
     var pressure = impulsePerFrame / area;
+    // Update readings
     volumeReading.innerText = volume.toString();
-    amountReading.innerText = defaultGas.getParticleAmount().toString();
+    particleCountReading.innerText = defaultGas.getParticleCount().toString();
     temperatureReading.innerText = defaultGas.getTemperature().toFixed(2).toString();
     avgKEReading.innerText = defaultGas.getAvgKE().toFixed(2).toString();
     pressureReading.innerText = pressure.toFixed(5).toString();
@@ -540,10 +552,11 @@ function updateFrame() {
         }
     }
 }
-// ==================================================================================================
-// ==== EVENT HANDLERS ==============================================================================
-// ==================================================================================================
-pauseButton.onclick = function () {
+// =================================================================================================
+// ==== EVENT HANDLERS =============================================================================
+// =================================================================================================
+var pauseButton = document.getElementById("pause-button");
+pauseButton.addEventListener("click", function (event) {
     if (isPaused) {
         isPaused = false;
         pauseButton.innerText = "Pause";
@@ -552,18 +565,18 @@ pauseButton.onclick = function () {
         isPaused = true;
         pauseButton.innerText = "Unpause";
     }
-};
-canvas.addEventListener("mousedown", function (e) {
-    var mousePos = getCursorPosition(e);
+});
+canvas.addEventListener("mousedown", function (event) {
+    var mousePos = getCursorPosition(event);
     defaultGas.createParticle(new Vector(0, 0), mousePos, "red", undefined, 15);
 });
-document.addEventListener("keydown", function (e) {
-    if (e.key === " ") {
+document.addEventListener("keydown", function (event) {
+    if (event.key === " ") {
         allowCollisions = !allowCollisions;
     }
 });
-canvasResizeForm.addEventListener("submit", function (e) {
-    e.preventDefault();
+canvasResizeForm.addEventListener("submit", function (event) {
+    event.preventDefault();
     var submittedHeight = heightInput.value;
     var submittedWidth = widthInput.value;
     if (submittedHeight === "") {
@@ -574,4 +587,17 @@ canvasResizeForm.addEventListener("submit", function (e) {
     }
     var newSize = { height: parseInt(submittedHeight), width: parseInt(submittedWidth) };
     resizeCanvas(newSize);
+});
+particleCountForm.addEventListener("submit", function (event) {
+    event.preventDefault();
+    var submittedParticleCount = particleCountInput.value;
+    if (submittedParticleCount === "") {
+        return;
+    }
+    defaultGas.setParticleCount(parseInt(submittedParticleCount), initialBallKE);
+    updateParticleCount();
+});
+particleCountSlider.addEventListener("input", function (event) {
+    defaultGas.setParticleCount(this.value, initialBallKE);
+    updateParticleCount();
 });

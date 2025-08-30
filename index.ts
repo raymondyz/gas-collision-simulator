@@ -1,6 +1,6 @@
-// ==================================================================================================
-// ==== Classes =====================================================================================
-// ==================================================================================================
+// =================================================================================================
+// ==== Classes ====================================================================================
+// =================================================================================================
 
 class Utils {
   static getDist(vec1: {x: number, y: number}, vec2: {x: number, y: number}): number {
@@ -30,9 +30,9 @@ class Vector {
   x: number;
   y: number;
 
-  constructor(x: number = 1, y: number = 1) {
-    this.x = x;
-    this.y = y;
+  constructor(x?: number, y?: number) {
+    this.x = x ?? 1;
+    this.y = y ?? 1;
   }
   
   getCopy(): Vector {
@@ -128,13 +128,13 @@ class Ball {
   radius: number;
   color: string;
 
-  constructor(pos: Vector, mass: number = 1, radius: number = 20, vel: Vector = new Vector(0, 0), color: string = "black") {
+  constructor(pos: Vector, mass?: number, radius?: number, vel?: Vector, color?: string) {
     this.pos = pos;
-    this.vel = vel;
-    this.mass = mass;
+    this.vel = vel ?? new Vector(0, 0);
+    this.mass = mass ?? 1;
 
-    this.radius = radius;
-    this.color = color;
+    this.radius = radius ?? 20;
+    this.color = color ?? "black";
   }
 
   draw(ctx: any): void {
@@ -237,7 +237,7 @@ class Ball {
       return
     }
 
-    // If balls have exact same pos, offset a bit
+    // If balls have exact same pos, offset a bit to avoid division by zero
     if (this.pos.x === other.pos.x && this.pos.y === other.pos.y) {
       this.pos.x += 0.00001
     }
@@ -255,45 +255,52 @@ class Ball {
 
 }
 
+// !!! WORK IN PROGRESS
+class TracerBall extends Ball {
+  constructor(pos: Vector, mass?: number , radius?: number, vel?: Vector, color?: string) {
+    super(pos, mass, radius, vel, color);
+  }
+
+  draw(ctx: any): void {
+    super.draw(ctx);
+
+    // TO BE IMPLEMENTED
+  }
+
+  updatePosition(): void {
+    super.updatePosition();
+
+    // TO BE IMPLEMENTED
+  }
+}
+
 class ParticleFluid {
   particleList: Ball[];
   color: string;
   mass: number;
   radius: number;
 
-  constructor(particleList: Ball[] = [], color: string = "black", mass: number = 1, radius: number = 7) {
-    this.particleList = particleList;
-    this.color = color;
-    this.mass = mass;
-    this.radius = radius;
+  constructor(particleList?: Ball[], color?: string, mass?: number, radius?: number) {
+    this.particleList = particleList ?? [];
+    this.color = color ?? "black";
+    this.mass = mass ?? 1;
+    this.radius = radius ?? 7;
   }
 
-  createParticle(vel: Vector | undefined = undefined, pos: Vector | undefined = undefined, color: string | undefined = undefined, mass: number | undefined = undefined, radius: number | undefined = undefined): void {
-    if (radius === undefined) {
-      radius = this.radius;
-    }
-    if (pos === undefined) {
-      pos = new Vector(Utils.getRandInt(radius, canvas.width - radius), Utils.getRandInt(radius, canvas.height - radius));
-    }
-    if (vel === undefined) {
-      vel = new Vector(0, 0);
-    }
-    if (color === undefined) {
-      color = this.color;
-    }
-    if (mass === undefined) {
-      mass = this.mass;
-    }
+  createParticle(vel?: Vector, pos?: Vector, color?: string, mass?: number, radius?: number): void {
+    radius = radius ?? this.radius;
+    pos = pos ?? new Vector(Utils.getRandInt(radius, canvas.width - radius), Utils.getRandInt(radius, canvas.height - radius));
+    vel = vel ?? new Vector(0, 0);
+    color = color ?? this.color;
+    mass = mass ?? this.mass;
 
     const particle = new Ball(pos, mass, radius, vel, color);
 
     this.particleList.push(particle);
   }
 
-  createKEParticle(KE: number, pos: Vector | undefined = undefined, direction: Vector | undefined = undefined, color: string | undefined = undefined, mass: number | undefined = undefined, radius: number | undefined = undefined): void {
-    if (mass === undefined) {
-      mass = this.mass;
-    }
+  createKEParticle(KE: number, pos?: Vector, direction?: Vector, color?: string, mass?: number, radius?: number): void {
+    mass = mass ?? this.mass;
 
     // KE = 0.5 * m * (v**2)
     // v = sqrt(2 * KE / m)
@@ -311,7 +318,7 @@ class ParticleFluid {
 
   }
 
-  getParticleAmount(): number {
+  getParticleCount(): number {
     return this.particleList.length
   }
 
@@ -356,10 +363,9 @@ class ParticleFluid {
   }
 
   // !!! Work in progress, for now is equivalent to getAvgKE
-  getTemperature(particleList: Ball[] | undefined = undefined, R_constant: number = 1): number {
-    if (particleList === undefined) {
-      particleList = this.particleList;
-    }
+  getTemperature(particleList?: Ball[], R_constant: number = 1): number {
+    particleList = particleList ?? this.particleList;
+
     if (particleList.length === 0) {
       return 0;
     }
@@ -374,6 +380,23 @@ class ParticleFluid {
     return temperature
   }
 
+  // Adds/removes particles until count is met
+  setParticleCount(count: number, newParticleKE: number): void {
+    if (count < 0) {
+      return;
+    }
+
+    // Add if under, remove if over, left with wanted count
+    while (this.getParticleCount() < count) {
+      this.createKEParticle(newParticleKE);
+    }
+    while (this.getParticleCount() > count) {
+      this.particleList.pop();
+    }
+
+    // Side note: Thanks Shun Akiyama, what a cool way to get the right count!
+  }
+
 }
 
 
@@ -386,12 +409,12 @@ type timedNumber = {
 // A stack of timed numbers
 // !!! Timed numbers must be added in chronological order
 class TimedNumberStack {
-  maxAmount: number;
+  maxCount: number;
 
   entryList: timedNumber[] = [];
 
-  constructor(maxAmount: number = 10000) {
-    this.maxAmount = maxAmount
+  constructor(maxCount?: number) {
+    this.maxCount = maxCount ?? 10000;
   }
 
   getTimeWindow(): number {
@@ -411,7 +434,7 @@ class TimedNumberStack {
 
     this.entryList.push(entry);
 
-    if (this.entryList.length > this.maxAmount) {
+    if (this.entryList.length > this.maxCount) {
       this.entryList.shift()
     }
   }
@@ -467,31 +490,37 @@ type dimensions = {
   width: number
 } 
 
-// ==================================================================================================
-// ==== Main Code ===================================================================================
-// ==================================================================================================
+// =================================================================================================
+// ==== Main Code ==================================================================================
+// =================================================================================================
 
 const canvas: any = document.getElementById("myCanvas");
 const ctx = canvas.getContext("2d");
 
-const canvasResizer: any = document.getElementById("canvas-resizer");
-const pauseButton: any = document.getElementById("pause-button");
 
-const volumeReading = document.getElementById("volume-reading");
-const amountReading = document.getElementById("amount-reading");
-const temperatureReading = document.getElementById("temperature-reading");
-const pressureReading = document.getElementById("pressure-reading");
-const avgKEReading = document.getElementById("avg-ke-reading");
+// Inputs
+const canvasResizer: any = document.getElementById("canvas-resizer");
 
 const canvasResizeForm: any = document.getElementById("canvas-resize-form");
 const heightInput: any = document.getElementById("height-input");
 const widthInput: any = document.getElementById("width-input");
 
+const particleCountForm: any = document.getElementById("particle-count-form");
+const particleCountInput: any = document.getElementById("particle-count-input");
+const particleCountSlider: any = document.getElementById("particle-count-slider");
+
+// Readings
+const volumeReading = document.getElementById("volume-reading");
+const particleCountReading = document.getElementById("particle-count-reading");
+const temperatureReading = document.getElementById("temperature-reading");
+const pressureReading = document.getElementById("pressure-reading");
+const avgKEReading = document.getElementById("avg-ke-reading");
+
+// Consts
 const CANVAS_RECT = canvas.getBoundingClientRect();
 const FPS = 20;
 
 let canvasSize: dimensions;
-
 updateCanvasSize()
 
 // ==== Global Vars ==================================
@@ -499,8 +528,8 @@ updateCanvasSize()
 let isPaused = false;
 
 let allowCollisions = true;
-let initalBallAmount = 1000
-let initialBallKE = 50
+let initalBallCount = 1000
+let initialBallKE = 100
 let ballRadius = 7
 
 // ==== Tracking Vars ==================================
@@ -514,18 +543,19 @@ const wallImpulseTracker = new TimedNumberStack();
 const defaultGas = new ParticleFluid(undefined, undefined, undefined, ballRadius);
 
 
-for (let i = 0; i < initalBallAmount; i ++) {
+for (let i = 0; i < initalBallCount; i ++) {
   defaultGas.createKEParticle(initialBallKE)
 }
 
+updateParticleCount()
 
 // Set frame rate
 setInterval(updateFrame, 1000 / FPS);
 
 
-// ==================================================================================================
-// ==== Functions ===================================================================================
-// ==================================================================================================
+// =================================================================================================
+// ==== Functions ==================================================================================
+// =================================================================================================
 
 
 // ==== UTILITY FUNCTIONS ==================================
@@ -566,10 +596,18 @@ function resizeCanvas(newSize: dimensions): void {
   console.log("Container Resized!")
 }
 
-function updateCanvasSize(prevSize: dimensions | null = null): void {
-  if (prevSize === null || prevSize.height !== canvas.clientHeight || prevSize.width !== canvas.clientWidth) {
+function updateCanvasSize(prevSize?: dimensions): void {
+  if (prevSize === undefined || prevSize.height !== canvas.clientHeight || prevSize.width !== canvas.clientWidth) {
     resizeCanvas({height: canvas.clientHeight, width: canvas.clientWidth});
   }
+}
+
+function updateParticleCount(): void {
+  particleCountInput.placeholder = defaultGas.getParticleCount();
+  particleCountInput.value = "";
+
+  particleCountSlider.value = defaultGas.getParticleCount();
+
 }
 
 
@@ -643,8 +681,9 @@ function updateUI(): void {
   const impulsePerFrame = wallImpulseTracker.sumNewEntries(frameNum - avgingWindow) / avgingWindow;
   const pressure = impulsePerFrame / area;
 
+  // Update readings
   volumeReading!.innerText = volume.toString();
-  amountReading!.innerText = defaultGas.getParticleAmount().toString();
+  particleCountReading!.innerText = defaultGas.getParticleCount().toString();
   temperatureReading!.innerText = defaultGas.getTemperature().toFixed(2).toString();
   avgKEReading!.innerText = defaultGas.getAvgKE().toFixed(2).toString();
   pressureReading!.innerText = pressure.toFixed(5).toString();
@@ -683,11 +722,13 @@ function updateFrame(): void {
 }
 
 
-// ==================================================================================================
-// ==== EVENT HANDLERS ==============================================================================
-// ==================================================================================================
+// =================================================================================================
+// ==== EVENT HANDLERS =============================================================================
+// =================================================================================================
 
-pauseButton.onclick = function() {
+const pauseButton: any = document.getElementById("pause-button");
+
+pauseButton.addEventListener("click", function(event) {
   if (isPaused) {
     isPaused = false
     pauseButton.innerText = "Pause"
@@ -696,23 +737,23 @@ pauseButton.onclick = function() {
     isPaused = true
     pauseButton.innerText = "Unpause"
   }
-}
+})
 
 
-canvas.addEventListener("mousedown", function (e) {
-  const mousePos = getCursorPosition(e);
+canvas.addEventListener("mousedown", function (event) {
+  const mousePos = getCursorPosition(event);
 
   defaultGas.createParticle(new Vector(0, 0), mousePos, "red", undefined, 15)
 });
 
-document.addEventListener("keydown", function (e) {
-  if (e.key === " ") {
+document.addEventListener("keydown", function (event) {
+  if (event.key === " ") {
     allowCollisions = !allowCollisions
   }
 });
 
-canvasResizeForm.addEventListener("submit", function (e) {
-  e.preventDefault();
+canvasResizeForm.addEventListener("submit", function (event) {
+  event.preventDefault();
 
   let submittedHeight = heightInput.value;
   let submittedWidth = widthInput.value;
@@ -729,3 +770,23 @@ canvasResizeForm.addEventListener("submit", function (e) {
   resizeCanvas(newSize)
   
 });
+
+particleCountForm.addEventListener("submit", function (event) {
+  event.preventDefault();
+
+  let submittedParticleCount: string = particleCountInput.value;
+
+  if (submittedParticleCount === "") {
+    return;
+  }
+
+  defaultGas.setParticleCount(parseInt(submittedParticleCount), initialBallKE);
+
+  updateParticleCount()
+})
+
+particleCountSlider.addEventListener("input", function(event) {
+  defaultGas.setParticleCount(this.value, initialBallKE);
+
+  updateParticleCount()
+})
