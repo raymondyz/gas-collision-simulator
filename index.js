@@ -143,7 +143,7 @@ var Ball = /** @class */ (function () {
         var velocity_f = normalVel_f.getAddition(tangentVel_f); // Final ball velocity
         // Wall impulse tracking
         var impulse = this.vel.getDifference(velocity_f).getScaled(this.mass);
-        wallImpulseTracker.addEntry(createTimedNumber(frameNum, impulse.getMagnitude()));
+        wallImpulseTracker.addEntry(createTimedValue(frameNum, impulse.getMagnitude()));
         this.vel = velocity_f;
     };
     Ball.prototype.applyWallCollision = function (xMin, yMin, xMax, yMax) {
@@ -216,6 +216,44 @@ var Ball = /** @class */ (function () {
     };
     return Ball;
 }());
+// !!! WORK IN PROGRESS
+// TODO BUG: has some problems with tail segments moving
+// (following the ball, when a new segment should have been created)
+var TracerBall = /** @class */ (function (_super) {
+    __extends(TracerBall, _super);
+    function TracerBall(pos, mass, radius, vel, color, maxTailLength) {
+        var _this = _super.call(this, pos, mass, radius, vel, color) || this;
+        _this.tracerTail = [];
+        _this.maxTailLength = maxTailLength !== null && maxTailLength !== void 0 ? maxTailLength : 200;
+        return _this;
+    }
+    TracerBall.prototype.draw = function (ctx) {
+        _super.prototype.draw.call(this, ctx);
+        // Draw tail
+        if (this.tracerTail.length !== 0) {
+            var startPos = this.tracerTail[0];
+            ctx.beginPath();
+            ctx.strokeStyle = this.color;
+            ctx.lineWidth = 2;
+            ctx.moveTo(startPos.x, startPos.y);
+            for (var _i = 0, _a = this.tracerTail; _i < _a.length; _i++) {
+                var pos = _a[_i];
+                ctx.lineTo(pos.x, pos.y);
+            }
+            ctx.stroke();
+        }
+    };
+    TracerBall.prototype.updatePosition = function () {
+        _super.prototype.updatePosition.call(this);
+        console.log('e');
+        this.tracerTail.push(this.pos);
+        if (this.tracerTail.length > this.maxTailLength) {
+            this.tracerTail.shift();
+            console.log('x');
+        }
+    };
+    return TracerBall;
+}(Ball));
 var ParticleFluid = /** @class */ (function () {
     function ParticleFluid(particleList, color, mass, radius) {
         this.particleList = particleList !== null && particleList !== void 0 ? particleList : [];
@@ -316,28 +354,20 @@ var ParticleFluid = /** @class */ (function () {
     };
     return ParticleFluid;
 }());
-var TracerBall = /** @class */ (function (_super) {
-    __extends(TracerBall, _super);
-    function TracerBall(pos, mass, radius, vel, color) {
-        return _super.call(this, pos, mass, radius, vel, color) || this;
-    }
-    return TracerBall;
-}(Ball));
-console.log(new TracerBall(new Vector(0, 0), 1, 1));
-// A stack of timed numbers
-// !!! Timed numbers must be added in chronological order
-var TimedNumberStack = /** @class */ (function () {
-    function TimedNumberStack(maxCount) {
+// A stack of timed values
+// !!! Timed values must be added in chronological order
+var TimedStack = /** @class */ (function () {
+    function TimedStack(maxCount) {
         this.entryList = [];
         this.maxCount = maxCount !== null && maxCount !== void 0 ? maxCount : 10000;
     }
-    TimedNumberStack.prototype.getTimeWindow = function () {
+    TimedStack.prototype.getTimeWindow = function () {
         if (this.entryList.length < 2) {
             return 0;
         }
         return (this.entryList[this.entryList.length - 1].timestamp - this.entryList[0].timestamp);
     };
-    TimedNumberStack.prototype.addEntry = function (entry) {
+    TimedStack.prototype.addEntry = function (entry) {
         // Error if entry is not in chronological order
         if (this.entryList.length !== 0 && entry.timestamp < this.entryList[this.entryList.length - 1].timestamp) {
             console.error("Entry is not in chronological order");
@@ -348,7 +378,7 @@ var TimedNumberStack = /** @class */ (function () {
             this.entryList.shift();
         }
     };
-    TimedNumberStack.prototype.purgeOldEntries = function (oldestAcceptedTimestamp) {
+    TimedStack.prototype.purgeOldEntries = function (oldestAcceptedTimestamp) {
         // Find oldest allowed entry
         for (var i = 0; i < this.entryList.length; i++) {
             if (this.entryList[i].timestamp >= oldestAcceptedTimestamp) {
@@ -360,7 +390,7 @@ var TimedNumberStack = /** @class */ (function () {
         // All entries are too old
         this.entryList.splice(0);
     };
-    TimedNumberStack.prototype.getNewEntries = function (oldestAcceptedTimestamp) {
+    TimedStack.prototype.getNewEntries = function (oldestAcceptedTimestamp) {
         // Find oldest wanted entry
         for (var i = 0; i < this.entryList.length; i++) {
             if (this.entryList[i].timestamp >= oldestAcceptedTimestamp) {
@@ -371,16 +401,7 @@ var TimedNumberStack = /** @class */ (function () {
         // No entries are new enough
         return [];
     };
-    TimedNumberStack.prototype.sumNewEntries = function (oldestAcceptedTimestamp) {
-        var validEntries = this.getNewEntries(oldestAcceptedTimestamp);
-        var total = 0;
-        for (var _i = 0, validEntries_1 = validEntries; _i < validEntries_1.length; _i++) {
-            var entry = validEntries_1[_i];
-            total += entry.value;
-        }
-        return total;
-    };
-    return TimedNumberStack;
+    return TimedStack;
 }());
 // =================================================================================================
 // ==== Main Code ==================================================================================
@@ -414,7 +435,7 @@ var initialBallKE = 100;
 var ballRadius = 7;
 // ==== Tracking Vars ==================================
 var frameNum = 0;
-var wallImpulseTracker = new TimedNumberStack();
+var wallImpulseTracker = new TimedStack();
 // ==== Initial Setup ==================================
 var defaultGas = new ParticleFluid(undefined, undefined, undefined, ballRadius);
 for (var i = 0; i < initalBallCount; i++) {
@@ -427,7 +448,7 @@ setInterval(updateFrame, 1000 / FPS);
 // ==== Functions ==================================================================================
 // =================================================================================================
 // ==== UTILITY FUNCTIONS ==================================
-function createTimedNumber(timestamp, value) {
+function createTimedValue(timestamp, value) {
     return { timestamp: timestamp, value: value };
 }
 function getCursorPosition(event) {
@@ -516,7 +537,9 @@ function updateUI() {
     var avgingWindow = Utils.bound(wallImpulseTracker.getTimeWindow(), 1, 20);
     var volume = canvas.width * canvas.height;
     var area = 2 * (canvas.width + canvas.height);
-    var impulsePerFrame = wallImpulseTracker.sumNewEntries(frameNum - avgingWindow) / avgingWindow;
+    // Averages the values of every timed number within the averaging window
+    var impulseList = wallImpulseTracker.getNewEntries(frameNum - avgingWindow);
+    var impulsePerFrame = impulseList.reduce(function (acc, timedValue) { return (acc + timedValue.value); }, 0) / avgingWindow;
     var pressure = impulsePerFrame / area;
     // Update readings
     volumeReading.innerText = volume.toString();
@@ -568,7 +591,8 @@ pauseButton.addEventListener("click", function (event) {
 });
 canvas.addEventListener("mousedown", function (event) {
     var mousePos = getCursorPosition(event);
-    defaultGas.createParticle(new Vector(0, 0), mousePos, "red", undefined, 15);
+    // defaultGas.createParticle(new Vector(0, 0), mousePos, "red", undefined, 15)
+    defaultGas.particleList.push(new TracerBall(mousePos, undefined, 15, undefined, "red"));
 });
 document.addEventListener("keydown", function (event) {
     if (event.key === " ") {

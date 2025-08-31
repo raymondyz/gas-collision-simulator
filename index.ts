@@ -169,7 +169,7 @@ class Ball {
 
     // Wall impulse tracking
     const impulse = this.vel.getDifference(velocity_f).getScaled(this.mass)
-    wallImpulseTracker.addEntry(createTimedNumber(frameNum, impulse.getMagnitude()))
+    wallImpulseTracker.addEntry(createTimedValue<number>(frameNum, impulse.getMagnitude()))
 
     this.vel = velocity_f;
   }
@@ -256,21 +256,46 @@ class Ball {
 }
 
 // !!! WORK IN PROGRESS
+// TODO BUG: has some problems with tail segments moving
+// (following the ball, when a new segment should have been created)
 class TracerBall extends Ball {
-  constructor(pos: Vector, mass?: number , radius?: number, vel?: Vector, color?: string) {
+  tracerTail: Vector[] = [];
+  maxTailLength: number;
+
+  constructor(pos: Vector, mass?: number , radius?: number, vel?: Vector, color?: string, maxTailLength?: number) {
     super(pos, mass, radius, vel, color);
+    this.maxTailLength = maxTailLength ?? 200;
   }
 
   draw(ctx: any): void {
     super.draw(ctx);
 
-    // TO BE IMPLEMENTED
+    // Draw tail
+    if (this.tracerTail.length !== 0) {
+      const startPos = this.tracerTail[0];
+      ctx.beginPath();
+      ctx.strokeStyle = this.color;
+      ctx.lineWidth = 2;
+      ctx.moveTo(startPos.x, startPos.y);
+
+      for (const pos of this.tracerTail) {
+        ctx.lineTo(pos.x, pos.y);
+      }
+
+      ctx.stroke();
+
+    }
   }
 
   updatePosition(): void {
     super.updatePosition();
+    console.log('e')
 
-    // TO BE IMPLEMENTED
+    this.tracerTail.push(this.pos);
+    if (this.tracerTail.length > this.maxTailLength) {
+      this.tracerTail.shift();
+          console.log('x')
+    }
   }
 }
 
@@ -399,19 +424,18 @@ class ParticleFluid {
 
 }
 
-
-// A number tied to a timestamp
-type timedNumber = {
+// A value tied to a timestamp
+type TimedValue<T> = {
   timestamp: number,
-  value: number
+  value: T
 }
 
-// A stack of timed numbers
-// !!! Timed numbers must be added in chronological order
-class TimedNumberStack {
+// A stack of timed values
+// !!! Timed values must be added in chronological order
+class TimedStack<T> {
   maxCount: number;
 
-  entryList: timedNumber[] = [];
+  entryList: TimedValue<T>[] = [];
 
   constructor(maxCount?: number) {
     this.maxCount = maxCount ?? 10000;
@@ -425,7 +449,7 @@ class TimedNumberStack {
     return (this.entryList[this.entryList.length-1].timestamp - this.entryList[0].timestamp)
   }
 
-  addEntry(entry: timedNumber): void {
+  addEntry(entry: TimedValue<T>): void {
     // Error if entry is not in chronological order
     if (this.entryList.length !== 0 && entry.timestamp < this.entryList[this.entryList.length-1].timestamp) {
       console.error("Entry is not in chronological order")
@@ -455,7 +479,7 @@ class TimedNumberStack {
     this.entryList.splice(0)
   }
 
-  getNewEntries(oldestAcceptedTimestamp: number): timedNumber[] {
+  getNewEntries(oldestAcceptedTimestamp: number): TimedValue<T>[] {
 
     // Find oldest wanted entry
     for (let i = 0; i < this.entryList.length; i ++) {
@@ -469,19 +493,6 @@ class TimedNumberStack {
     // No entries are new enough
     return [];
   }
-
-  sumNewEntries(oldestAcceptedTimestamp: number): number {
-    const validEntries = this.getNewEntries(oldestAcceptedTimestamp);
-
-    let total = 0;
-
-    for (const entry of validEntries) {
-      total += entry.value
-    }
-
-    return total
-  }
-
 }
 
 
@@ -535,7 +546,7 @@ let ballRadius = 7
 // ==== Tracking Vars ==================================
 
 let frameNum = 0;
-const wallImpulseTracker = new TimedNumberStack();
+const wallImpulseTracker = new TimedStack<number>();
 
 
 // ==== Initial Setup ==================================
@@ -560,7 +571,7 @@ setInterval(updateFrame, 1000 / FPS);
 
 // ==== UTILITY FUNCTIONS ==================================
 
-function createTimedNumber(timestamp: number, value: number): timedNumber {
+function createTimedValue<T>(timestamp: number, value: T): TimedValue<T> {
   return {timestamp: timestamp, value: value};
 }
 
@@ -678,7 +689,11 @@ function updateUI(): void {
 
   const volume = canvas.width*canvas.height;
   const area = 2*(canvas.width + canvas.height);
-  const impulsePerFrame = wallImpulseTracker.sumNewEntries(frameNum - avgingWindow) / avgingWindow;
+
+  // Averages the values of every timed number within the averaging window
+  const impulseList = wallImpulseTracker.getNewEntries(frameNum - avgingWindow);
+  const impulsePerFrame = impulseList.reduce((acc, timedValue) => (acc + timedValue.value), 0) / avgingWindow;
+
   const pressure = impulsePerFrame / area;
 
   // Update readings
@@ -743,7 +758,8 @@ pauseButton.addEventListener("click", function(event) {
 canvas.addEventListener("mousedown", function (event) {
   const mousePos = getCursorPosition(event);
 
-  defaultGas.createParticle(new Vector(0, 0), mousePos, "red", undefined, 15)
+  // defaultGas.createParticle(new Vector(0, 0), mousePos, "red", undefined, 15)
+  defaultGas.particleList.push(new TracerBall(mousePos, undefined, 15, undefined, "red"))
 });
 
 document.addEventListener("keydown", function (event) {
