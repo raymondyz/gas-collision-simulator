@@ -624,45 +624,70 @@ function updateParticleCount(): void {
 
 // ==== TRACKING FUNCTIONS ==================================
 
+function maxwellBoltzmannDist(speed: number, mass: number, temp: number, k: number = 1): number {
+  const kT = k * temp
+  return (mass * speed / kT) * Math.exp(-(mass * speed**2)/(2 * kT))
+}
 
 function updateHistogram(balls: Ball[] = defaultGas.particleList): void {
+  const binSize = 2;      // (default 2)
+  const xUpperbound = 80; // (default 80)
+  const yUpperBound = 20; // in percent (default 20)
 
   const ballSpeeds: number[] = [];
   for (const ball of balls) {
     ballSpeeds.push(ball.vel.getMagnitude());
   }
 
-  const trace = {
+  const speedHist = {
     x: ballSpeeds,
     type: 'histogram',
     histnorm: "percent",
     xbins: {
       start: 0,
-      end: 100,
-      size: 2
+      end: xUpperbound,
+      size: binSize
     },
     marker: {
       color: 'skyblue',
-    }
+    },
+    name: 'Particle Speeds',
   };
+
+  // Generate data for Maxwell-Boltzmann curve
+  let x_vals: number[] = [];
+  let y_vals: number[] = [];
+  for (let x = 0; x < xUpperbound; x += 0.1) {
+    x_vals.push(x);
+    y_vals.push(100*binSize*maxwellBoltzmannDist(x, 1, initialBallKE));
+  }
+
+  const funcLine = {
+    x: x_vals,
+    y: y_vals,
+    type: 'scatter',
+    mode: 'lines',
+    line: {color: 'green'},
+    name: 'Maxwell-Boltzmann',
+  }
 
   const layout = {
     title: { text: "Speed Distribution" },
     xaxis: {
       title: { text: "Speed" },
-      range: [0, 80] // [0, 80]
+      range: [0, xUpperbound]
     },
     yaxis: {
       title: { text: "Percent %" },
-      range: [0, 20]
+      range: [0, yUpperBound]
     },
     bargap: 0.05
   };
 
-  const data = [trace];
+  const traces = [speedHist, funcLine];
   
   // @ts-ignore
-  Plotly.newPlot('histogram1', data, layout, { displayModeBar: false });
+  Plotly.newPlot('histogram1', traces, layout, { displayModeBar: false });
 }
 
 

@@ -485,41 +485,65 @@ function updateParticleCount() {
     particleCountSlider.value = defaultGas.getParticleCount();
 }
 // ==== TRACKING FUNCTIONS ==================================
+function maxwellBoltzmannDist(speed, mass, temp, k) {
+    if (k === void 0) { k = 1; }
+    var kT = k * temp;
+    return (mass * speed / kT) * Math.exp(-(mass * Math.pow(speed, 2)) / (2 * kT));
+}
 function updateHistogram(balls) {
     if (balls === void 0) { balls = defaultGas.particleList; }
+    var binSize = 2; // (default 2)
+    var xUpperbound = 80; // (default 80)
+    var yUpperBound = 20; // in percent (default 20)
     var ballSpeeds = [];
     for (var _i = 0, balls_1 = balls; _i < balls_1.length; _i++) {
         var ball = balls_1[_i];
         ballSpeeds.push(ball.vel.getMagnitude());
     }
-    var trace = {
+    var speedHist = {
         x: ballSpeeds,
         type: 'histogram',
         histnorm: "percent",
         xbins: {
             start: 0,
-            end: 100,
-            size: 2
+            end: xUpperbound,
+            size: binSize
         },
         marker: {
             color: 'skyblue',
-        }
+        },
+        name: 'Particle Speeds',
+    };
+    // Generate data for Maxwell-Boltzmann curve
+    var x_vals = [];
+    var y_vals = [];
+    for (var x = 0; x < xUpperbound; x += 0.1) {
+        x_vals.push(x);
+        y_vals.push(100 * binSize * maxwellBoltzmannDist(x, 1, initialBallKE));
+    }
+    var funcLine = {
+        x: x_vals,
+        y: y_vals,
+        type: 'scatter',
+        mode: 'lines',
+        line: { color: 'green' },
+        name: 'Maxwell-Boltzmann',
     };
     var layout = {
         title: { text: "Speed Distribution" },
         xaxis: {
             title: { text: "Speed" },
-            range: [0, 80] // [0, 80]
+            range: [0, xUpperbound]
         },
         yaxis: {
             title: { text: "Percent %" },
-            range: [0, 20]
+            range: [0, yUpperBound]
         },
         bargap: 0.05
     };
-    var data = [trace];
+    var traces = [speedHist, funcLine];
     // @ts-ignore
-    Plotly.newPlot('histogram1', data, layout, { displayModeBar: false });
+    Plotly.newPlot('histogram1', traces, layout, { displayModeBar: false });
 }
 // ==== DRAW FUNCTIONS ==================================
 function drawFrame() {
