@@ -131,6 +131,24 @@ var Ball = /** @class */ (function () {
         if (gravConst === void 0) { gravConst = 1; }
         this.vel.y += gravConst;
     };
+    Ball.prototype.getKE = function () {
+        return 0.5 * this.mass * (Math.pow(this.vel.getMagnitude(), 2));
+    };
+    // Rescales vel, if zero vel (no orig direction), scales with random direction
+    Ball.prototype.setKE = function (KE) {
+        // KE = 0.5 * m * (v**2)
+        // v = sqrt(2 * KE / m)
+        var speed = Math.sqrt(2 * KE / this.mass);
+        var newVel;
+        if (this.vel.getMagnitude() === 0) {
+            var angle = Utils.getRandFloat(0, 2 * Math.PI);
+            newVel = (new Vector(speed, 0)).getRotated(angle);
+        }
+        else {
+            newVel = this.vel.getNormalized().getScaled(speed);
+        }
+        this.vel = newVel;
+    };
     // Collides the ball elastically with a surface of infinite mass
     // Assumes the ball is already in perfect contact with the surface (ignores position)
     Ball.prototype.surfaceCollide = function (surfaceNormal) {
@@ -216,8 +234,7 @@ var Ball = /** @class */ (function () {
     };
     return Ball;
 }());
-// !!! WORK IN PROGRESS
-// TODO BUG: has some problems with tail segments moving
+// !!! TODO BUG: tail looks weird when colliding with wall
 // (following the ball, when a new segment should have been created)
 var TracerBall = /** @class */ (function (_super) {
     __extends(TracerBall, _super);
@@ -243,23 +260,26 @@ var TracerBall = /** @class */ (function (_super) {
             ctx.stroke();
         }
     };
-    TracerBall.prototype.updatePosition = function () {
-        _super.prototype.updatePosition.call(this);
-        console.log('e');
-        this.tracerTail.push(this.pos);
+    TracerBall.prototype.addTailSegment = function (pos) {
+        if (pos === void 0) { pos = this.pos.getCopy(); }
+        this.tracerTail.push(pos);
         if (this.tracerTail.length > this.maxTailLength) {
             this.tracerTail.shift();
-            console.log('x');
         }
+    };
+    TracerBall.prototype.updatePosition = function () {
+        _super.prototype.updatePosition.call(this);
+        this.addTailSegment();
     };
     return TracerBall;
 }(Ball));
 var ParticleFluid = /** @class */ (function () {
-    function ParticleFluid(particleList, color, mass, radius) {
+    function ParticleFluid(particleList, color, mass, radius, newParticleKE) {
         this.particleList = particleList !== null && particleList !== void 0 ? particleList : [];
         this.color = color !== null && color !== void 0 ? color : "black";
         this.mass = mass !== null && mass !== void 0 ? mass : 1;
         this.radius = radius !== null && radius !== void 0 ? radius : 7;
+        this.newParticleKE = newParticleKE !== null && newParticleKE !== void 0 ? newParticleKE : 100;
     }
     ParticleFluid.prototype.createParticle = function (vel, pos, color, mass, radius) {
         radius = radius !== null && radius !== void 0 ? radius : this.radius;
@@ -272,6 +292,7 @@ var ParticleFluid = /** @class */ (function () {
     };
     ParticleFluid.prototype.createKEParticle = function (KE, pos, direction, color, mass, radius) {
         mass = mass !== null && mass !== void 0 ? mass : this.mass;
+        KE = KE !== null && KE !== void 0 ? KE : this.newParticleKE;
         // KE = 0.5 * m * (v**2)
         // v = sqrt(2 * KE / m)
         var speed = Math.sqrt(2 * KE / mass);
@@ -352,6 +373,23 @@ var ParticleFluid = /** @class */ (function () {
         }
         // Side note: Thanks Shun Akiyama, what a cool way to get the right count!
     };
+    // !!! TODO: assumes temp = KE
+    ParticleFluid.prototype.setTemperature = function (newTemp) {
+        if (this.getTemperature() === 0) {
+            for (var _i = 0, _a = this.particleList; _i < _a.length; _i++) {
+                var particle = _a[_i];
+                particle.setKE(newTemp);
+            }
+            return;
+        }
+        else {
+            var tempRatio = newTemp / this.getTemperature();
+            for (var _b = 0, _c = this.particleList; _b < _c.length; _b++) {
+                var particle = _c[_b];
+                particle.setKE(particle.getKE() * tempRatio);
+            }
+        }
+    };
     return ParticleFluid;
 }());
 // A stack of timed values
@@ -416,6 +454,9 @@ var widthInput = document.getElementById("width-input");
 var particleCountForm = document.getElementById("particle-count-form");
 var particleCountInput = document.getElementById("particle-count-input");
 var particleCountSlider = document.getElementById("particle-count-slider");
+var temperatureForm = document.getElementById("temperature-form");
+var temperatureInput = document.getElementById("temperature-input");
+var temperatureSlider = document.getElementById("temperature-slider");
 // Readings
 var volumeReading = document.getElementById("volume-reading");
 var particleCountReading = document.getElementById("particle-count-reading");
@@ -430,18 +471,20 @@ updateCanvasSize();
 // ==== Global Vars ==================================
 var isPaused = false;
 var allowCollisions = true;
-var initalBallCount = 1000;
-var initialBallKE = 100;
+var initialBallCount = 1000;
+var defaultBallKE = 100;
 var ballRadius = 7;
 // ==== Tracking Vars ==================================
 var frameNum = 0;
 var wallImpulseTracker = new TimedStack();
 // ==== Initial Setup ==================================
-var defaultGas = new ParticleFluid(undefined, undefined, undefined, ballRadius);
-for (var i = 0; i < initalBallCount; i++) {
-    defaultGas.createKEParticle(initialBallKE);
+var defaultGas = new ParticleFluid(undefined, undefined, undefined, ballRadius, defaultBallKE);
+for (var i = 0; i < initialBallCount; i++) {
+    defaultGas.createKEParticle();
 }
+// Initial UI update
 updateParticleCount();
+updateTemperature();
 // Set frame rate
 setInterval(updateFrame, 1000 / FPS);
 // =================================================================================================
@@ -483,6 +526,19 @@ function updateParticleCount() {
     particleCountInput.placeholder = defaultGas.getParticleCount();
     particleCountInput.value = "";
     particleCountSlider.value = defaultGas.getParticleCount();
+    updateTemperature();
+}
+// !!! Assumes temp = KE
+function updateTemperature() {
+    var temp = defaultGas.getTemperature();
+    // If no particles, keep old temperature
+    if (defaultGas.getParticleCount() === 0) {
+        temp = defaultGas.newParticleKE;
+    }
+    temperatureInput.placeholder = Math.round(temp);
+    temperatureInput.value = "";
+    temperatureSlider.value = temp;
+    defaultGas.newParticleKE = temp;
 }
 // ==== TRACKING FUNCTIONS ==================================
 function maxwellBoltzmannDist(speed, mass, temp, k) {
@@ -519,7 +575,7 @@ function updateHistogram(balls) {
     var y_vals = [];
     for (var x = 0; x < xUpperbound; x += 0.1) {
         x_vals.push(x);
-        y_vals.push(100 * binSize * maxwellBoltzmannDist(x, 1, initialBallKE));
+        y_vals.push(100 * binSize * maxwellBoltzmannDist(x, 1, defaultGas.getTemperature()));
     }
     var funcLine = {
         x: x_vals,
@@ -633,7 +689,7 @@ canvasResizeForm.addEventListener("submit", function (event) {
     if (submittedWidth === "") {
         submittedWidth = canvasSize.width;
     }
-    var newSize = { height: parseInt(submittedHeight), width: parseInt(submittedWidth) };
+    var newSize = { height: parseFloat(submittedHeight), width: parseFloat(submittedWidth) };
     resizeCanvas(newSize);
 });
 particleCountForm.addEventListener("submit", function (event) {
@@ -642,10 +698,23 @@ particleCountForm.addEventListener("submit", function (event) {
     if (submittedParticleCount === "") {
         return;
     }
-    defaultGas.setParticleCount(parseInt(submittedParticleCount), initialBallKE);
+    defaultGas.setParticleCount(parseFloat(submittedParticleCount));
     updateParticleCount();
 });
 particleCountSlider.addEventListener("input", function (event) {
-    defaultGas.setParticleCount(this.value, initialBallKE);
+    defaultGas.setParticleCount(this.value);
     updateParticleCount();
+});
+temperatureForm.addEventListener("submit", function (event) {
+    event.preventDefault();
+    var submittedTemperature = temperatureInput.value;
+    if (submittedTemperature === "") {
+        return;
+    }
+    defaultGas.setTemperature(parseFloat(submittedTemperature));
+    updateTemperature();
+});
+temperatureSlider.addEventListener("input", function (event) {
+    defaultGas.setTemperature(this.value);
+    updateTemperature();
 });

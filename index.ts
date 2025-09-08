@@ -153,6 +153,28 @@ class Ball {
     this.vel.y += gravConst;
   }
 
+  getKE(): number {
+    return 0.5 * this.mass * (this.vel.getMagnitude()**2);
+  }
+
+  // Rescales vel, if zero vel (no orig direction), scales with random direction
+  setKE(KE: number): void {
+    // KE = 0.5 * m * (v**2)
+    // v = sqrt(2 * KE / m)
+    const speed = Math.sqrt(2 * KE / this.mass)
+
+    let newVel: Vector;
+    if (this.vel.getMagnitude() === 0) {
+      const angle = Utils.getRandFloat(0, 2*Math.PI);
+      newVel = (new Vector(speed, 0)).getRotated(angle);
+    }
+    else {
+      newVel = this.vel.getNormalized().getScaled(speed);
+    }
+
+    this.vel = newVel;
+  }
+
   // Collides the ball elastically with a surface of infinite mass
   // Assumes the ball is already in perfect contact with the surface (ignores position)
   surfaceCollide(surfaceNormal: Vector): void {
@@ -255,8 +277,7 @@ class Ball {
 
 }
 
-// !!! WORK IN PROGRESS
-// TODO BUG: has some problems with tail segments moving
+// !!! TODO BUG: tail looks weird when colliding with wall
 // (following the ball, when a new segment should have been created)
 class TracerBall extends Ball {
   tracerTail: Vector[] = [];
@@ -287,15 +308,17 @@ class TracerBall extends Ball {
     }
   }
 
-  updatePosition(): void {
-    super.updatePosition();
-    console.log('e')
-
-    this.tracerTail.push(this.pos);
+  addTailSegment(pos: Vector = this.pos.getCopy()): void {
+    this.tracerTail.push(pos);
     if (this.tracerTail.length > this.maxTailLength) {
       this.tracerTail.shift();
-          console.log('x')
     }
+  }
+
+  updatePosition(): void {
+    super.updatePosition();
+
+    this.addTailSegment();
   }
 }
 
@@ -305,11 +328,14 @@ class ParticleFluid {
   mass: number;
   radius: number;
 
-  constructor(particleList?: Ball[], color?: string, mass?: number, radius?: number) {
+  newParticleKE: number; // !!! Assumes temp = KE
+
+  constructor(particleList?: Ball[], color?: string, mass?: number, radius?: number, newParticleKE?: number) {
     this.particleList = particleList ?? [];
     this.color = color ?? "black";
     this.mass = mass ?? 1;
     this.radius = radius ?? 7;
+    this.newParticleKE = newParticleKE ?? 100;
   }
 
   createParticle(vel?: Vector, pos?: Vector, color?: string, mass?: number, radius?: number): void {
@@ -324,8 +350,9 @@ class ParticleFluid {
     this.particleList.push(particle);
   }
 
-  createKEParticle(KE: number, pos?: Vector, direction?: Vector, color?: string, mass?: number, radius?: number): void {
+  createKEParticle(KE?: number, pos?: Vector, direction?: Vector, color?: string, mass?: number, radius?: number): void {
     mass = mass ?? this.mass;
+    KE = KE ?? this.newParticleKE;
 
     // KE = 0.5 * m * (v**2)
     // v = sqrt(2 * KE / m)
@@ -406,7 +433,7 @@ class ParticleFluid {
   }
 
   // Adds/removes particles until count is met
-  setParticleCount(count: number, newParticleKE: number): void {
+  setParticleCount(count: number, newParticleKE?: number): void {
     if (count < 0) {
       return;
     }
@@ -420,6 +447,25 @@ class ParticleFluid {
     }
 
     // Side note: Thanks Shun Akiyama, what a cool way to get the right count!
+  }
+
+  // !!! TODO: assumes temp = KE
+  setTemperature(newTemp: number): void {
+
+    if (this.getTemperature() === 0) {
+      for (const particle of this.particleList) {
+        particle.setKE(newTemp)
+      }
+      return;
+    }
+
+    else {
+      const tempRatio = newTemp / this.getTemperature();
+    
+      for (const particle of this.particleList) {
+        particle.setKE(particle.getKE() * tempRatio)
+      }
+    }
   }
 
 }
@@ -520,6 +566,11 @@ const particleCountForm: any = document.getElementById("particle-count-form");
 const particleCountInput: any = document.getElementById("particle-count-input");
 const particleCountSlider: any = document.getElementById("particle-count-slider");
 
+const temperatureForm: any = document.getElementById("temperature-form");
+const temperatureInput: any = document.getElementById("temperature-input");
+const temperatureSlider: any = document.getElementById("temperature-slider");
+
+
 // Readings
 const volumeReading = document.getElementById("volume-reading");
 const particleCountReading = document.getElementById("particle-count-reading");
@@ -539,8 +590,8 @@ updateCanvasSize()
 let isPaused = false;
 
 let allowCollisions = true;
-let initalBallCount = 1000
-let initialBallKE = 100
+let initialBallCount = 1000
+let defaultBallKE = 100
 let ballRadius = 7
 
 // ==== Tracking Vars ==================================
@@ -551,14 +602,16 @@ const wallImpulseTracker = new TimedStack<number>();
 
 // ==== Initial Setup ==================================
 
-const defaultGas = new ParticleFluid(undefined, undefined, undefined, ballRadius);
+const defaultGas = new ParticleFluid(undefined, undefined, undefined, ballRadius, defaultBallKE);
 
 
-for (let i = 0; i < initalBallCount; i ++) {
-  defaultGas.createKEParticle(initialBallKE)
+for (let i = 0; i < initialBallCount; i ++) {
+  defaultGas.createKEParticle()
 }
 
+// Initial UI update
 updateParticleCount()
+updateTemperature()
 
 // Set frame rate
 setInterval(updateFrame, 1000 / FPS);
@@ -619,6 +672,24 @@ function updateParticleCount(): void {
 
   particleCountSlider.value = defaultGas.getParticleCount();
 
+  updateTemperature();
+}
+
+// !!! Assumes temp = KE
+function updateTemperature(): void {
+  let temp = defaultGas.getTemperature()
+
+  // If no particles, keep old temperature
+  if (defaultGas.getParticleCount() === 0) {
+    temp = defaultGas.newParticleKE;
+  }
+
+  temperatureInput.placeholder = Math.round(temp);
+  temperatureInput.value = "";
+  
+  temperatureSlider.value = temp;
+
+  defaultGas.newParticleKE = temp;
 }
 
 
@@ -659,7 +730,7 @@ function updateHistogram(balls: Ball[] = defaultGas.particleList): void {
   let y_vals: number[] = [];
   for (let x = 0; x < xUpperbound; x += 0.1) {
     x_vals.push(x);
-    y_vals.push(100*binSize*maxwellBoltzmannDist(x, 1, initialBallKE));
+    y_vals.push(100*binSize*maxwellBoltzmannDist(x, 1, defaultGas.getTemperature()));
   }
 
   const funcLine = {
@@ -806,7 +877,7 @@ canvasResizeForm.addEventListener("submit", function (event) {
     submittedWidth = canvasSize.width;
   }
 
-  const newSize = {height: parseInt(submittedHeight), width: parseInt(submittedWidth)}
+  const newSize = {height: parseFloat(submittedHeight), width: parseFloat(submittedWidth)}
 
   resizeCanvas(newSize)
   
@@ -821,13 +892,34 @@ particleCountForm.addEventListener("submit", function (event) {
     return;
   }
 
-  defaultGas.setParticleCount(parseInt(submittedParticleCount), initialBallKE);
+  defaultGas.setParticleCount(parseFloat(submittedParticleCount));
 
   updateParticleCount()
 })
 
 particleCountSlider.addEventListener("input", function(event) {
-  defaultGas.setParticleCount(this.value, initialBallKE);
+  defaultGas.setParticleCount(this.value);
 
   updateParticleCount()
+})
+
+
+temperatureForm.addEventListener("submit", function (event) {
+  event.preventDefault();
+
+  let submittedTemperature: string = temperatureInput.value;
+
+  if (submittedTemperature === "") {
+    return;
+  }
+
+  defaultGas.setTemperature(parseFloat(submittedTemperature));
+
+  updateTemperature()
+})
+
+temperatureSlider.addEventListener("input", function(event) {
+  defaultGas.setTemperature(this.value);
+
+  updateTemperature()
 })

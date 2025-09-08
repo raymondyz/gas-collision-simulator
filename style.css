@@ -85,7 +85,7 @@ canvas {
   gap: 40px
 }
 
-.controls-container {
+.ui-column {
   display: flex;
   flex-direction: column;
   align-items: stretch;
